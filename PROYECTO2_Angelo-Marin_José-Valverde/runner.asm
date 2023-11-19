@@ -5,10 +5,11 @@
 
 ;CONSTANTS
 VIDEO_MEM equ 0A000h
+PUSHA equ push ax bx cx dx
 
 
-
-pressEnter db "Presione ENTER para continuar...$"
+pressEntermsg db "Presione ENTER para continuar...$"
+errLoading db "Hubo un error al cargar los datos de imagen. Saliendo$"
 
 ultima_c db 0
 vel dw 2
@@ -18,9 +19,9 @@ no_hit_count db 0
 toptimes dw 4 dup(0)
 number_size db 0
 
-obstaclex_matrix dw 320 dup(0)
-obstacley_matrix dw 320 dup(0)
-obstacle_ammount dw 0
+metx_matrix dw 320 dup(0)
+mety_matrix dw 320 dup(0)
+meteor_ammount dw 0
 matrix_pointer dw 0
 px_travel_since_spawn db 0
 
@@ -57,11 +58,11 @@ img_player db 730 dup(?)
 player_w dw ?
 player_h dw ?
 
-img_obstacle db 262 dup(?)
+img_meteor db 262 dup(?)
 
 
-obstacle_w dw ?
-obstacle_h dw ?
+meteor_w dw ?
+meteor_h dw ?
 
 
 
@@ -73,8 +74,16 @@ h_address dw ?
 y_address dw ?
 x_address dw ?
 
-obstacle_iname db "meteor.img",0
+meteor_iname db "meteor.img",0
 ;MACROS
+
+CLEAR_SCREEN MACRO
+xor di, di      ; Clear DI to start from the beginning of the video segment
+mov cx, 32000   ; Number of words (64000 bytes / 2)
+mov ah,color
+mov al,color 
+rep stosw       ; Clear screen using string operation
+ENDM
 
 IMPRIMIR MACRO text
    lea dx, text
@@ -86,30 +95,30 @@ UPDATE_TIME MACRO
 	add cx,1
 ENDM
 
-SPAWN_OBSTACLE MACRO yPosition
-	;cantidad??
-	
-	lea di, obstaclex_matrix
-	mov ax, obstacle_ammount
+SPAWN_ENTITY MACRO yPosition,EXMatrix,EYMatrix,ECounter,skipLabel
+	cmp ECounter,320
+	jge skipLabel
+	lea di, EXMatrix
+	mov ax, ECounter
 	shl ax,1
 	add di,ax
 	mov [di],300
-	lea di, obstacley_matrix
+	lea di, EYMatrix
 	add di, ax
 	mov bx, yPosition
 	mov [di],bx
-	inc obstacle_ammount
+	inc ECounter
 
 ENDM
 
-DRAW_OBSTACLES MACRO
-	LOAD_IMG_VARS obstacle_w,obstacle_h,img_obstacle
-	mov x_address, offset obstaclex_matrix
-	mov y_address, offset obstacley_matrix
-	mov cx,obstacle_ammount
-	drawobs_loop:
+DRAW_METEORS MACRO
+	LOAD_IMG_VARS meteor_w,meteor_h,img_meteor
+	mov x_address, offset metx_matrix
+	mov y_address, offset mety_matrix
+	mov cx,meteor_ammount
 	test cx,cx
 	jz noObstacles
+	drawobs_loop:
 	push cx
 	call draw_img
 	add x_address,2
@@ -119,6 +128,23 @@ DRAW_OBSTACLES MACRO
 	noObstacles:
 ENDM
 
+MOVE_ENTITIES MACRO
+	lea di,metx_matrix
+	mov cx,meteor_ammount
+	test cx,cx
+	jz endOfMeteors
+	moveMet_loop:
+	mov ax,[di]
+	sub ax,vel
+	cmp ax,vel
+	jge dontCheckCol
+	;check collision
+	dontCheckCol:
+	mov [di],ax
+	add di,2
+	loop moveMet_loop
+	endOfMeteors:
+ENDM
 ;Loads the address of img information into address variables
 CALL_LOAD_IMG MACRO imgName, imgW, imgH, img
 	lea ax, imgName
@@ -272,7 +298,7 @@ draw_rect proc
 endp
 
 ;lee un archivo cargado en dx
-read_file proc
+open_file proc
 	;INT 21h / AH= 3Dh - open existing file.
 	mov dx,  filename_address
 	mov al, 0
@@ -281,28 +307,21 @@ read_file proc
 	jc err
 	mov handle, ax
 	ret
-read_file endp
+open_file endp
 
 close_file proc
-	;INT 21h / AH= 3Eh - close file. 
 	mov bx, handle
 	mov ah, 3eh
-	int 21h ; close file... 
+	int 21h 
 	ret
 close_file endp
-;proc para leer imagen
+
 ;requiere filename_address, img_address, h_address, w_address
 load_img proc   
 	;INT 21h / AH= 3Dh - open existing file.
 	mov dx, filename_address
-	call read_file
-	;mov al, 0
-	;mov dx,  filename_address
-	;mov ah, 3dh
-	;int 21h
-	;jc err
-	;mov handle, ax
-	
+	call open_file
+	jc err
 	;INT 21h / AH= 42h - SEEK - set current file position.
 	mov al, 0
 	mov bx, handle
@@ -312,26 +331,23 @@ load_img proc
 	int 21h ; seek... 
 	jc err
 	
-	
 	;INT 21h / AH= 3Fh - read from file. 
 	mov bx, handle
 	mov dx, w_address
 	mov cx, 1
 	mov ah, 3fh
-	int 21h ; read from file...
+	int 21h 
 	jc err
 	
-
 	
-	;INT 21h / AH= 3Fh - read from file. 
 	mov bx, handle
 	mov dx, h_address
 	mov cx, 1
 	mov ah, 3fh
-	int 21h ; read from file... 
+	int 21h 
 	jc err
 	
-	;calcular tamano de la imagen
+	;calcular tamaño de la imagen
 	;para saber cuandos bytes leer
 	;w x h  = cantidad de bytes
 	mov di, w_address
@@ -340,8 +356,6 @@ load_img proc
 	mov bx, [di]
 	mul bx
 	mov cx, ax 
-	
-
 	
 	;INT 21h / AH= 3Fh - read from file. 
 	mov bx, handle
@@ -354,8 +368,8 @@ load_img proc
 	call close_file
 	jnc ok
 	err:
-
-		;ERROR!!!
+		IMPRIMIR errLoading
+		jmp exit
 	ok:
 ret    
 load_img endp
@@ -413,126 +427,129 @@ draw_img proc
 	ret    
 endp
 
+game proc
+
+	mov cx,5
+	mov meteor_y,0
+
+	spawn_20_meteors:
+		push cx
+		SPAWN_ENTITY meteor_y,metx_matrix,mety_matrix,meteor_ammount,noMoreSpace
+		add meteor_y,10
+		pop cx
+		loop spawn_20_meteors
+	noMoreSpace:
+	MOVE_ENTITIES
+	DRAW_METEORS
+
+	mov ax,meteor_ammount
+	call NumberToString
+	IMPRIMIR num_text
+
+	; wait for any key....    
+	mov ah, 10h
+	int 16h
+
+
+	mov meteor_x,294
+	mov meteor_y,0
+	mov vel, 1
+	mov ah, 02Ch
+	int 21h
+	mov ultima_c, dl
+	mov last_sec,dh
+	update:
+	mov ah, 02Ch
+	int 21h
+	mov ultima_c, dl
+	esperar:
+		int 21h
+		cmp dl, ultima_c
+		je esperar
+	mov ultima_c,0
+
+
+
+
+	CLEAR_SCREEN
+	mov cx,20
+	mov meteor_y,0
+	mov img_address, offset img_meteor
+	mov w_address, offset meteor_w
+	mov h_address, offset meteor_h
+	draw_20_meteors:
+		push cx
+		CALL_DRAW_IMG meteor_x, meteor_y
+		add meteor_y,10
+		pop cx
+		loop draw_20_meteors
+		
+	mov img_address, offset img_player
+	mov w_address, offset player_w
+	mov h_address, offset player_h
+	CALL_DRAW_IMG player_x,player_y
+	mov ax, vel
+	cmp meteor_x,ax
+	sub meteor_x,ax
+	jge notOver
+	mov meteor_x, 294
+	add vel,2
+	notOver:
+	;INT 21h / AH=2Ch - get system time;
+	;return: CH = hour. CL = minute. DH = second. DL = 1/100 seconds.  
+	mov ah, 02Ch
+	int 21h
+	mov ultima_c, dl
+
+	;para minimizar el flicker se mantiene la imagen un instante
+	esperar2:
+		int 21h          ; Call DOS interrupt to get time
+		cmp dl, ultima_c ; Compare current second with the last recorded second
+		je esperar2      ; Jump if equal (no second has passed)
+
+	; Time has changed, update ultima_c
+	mov ultima_c, dl
+	cmp dh,last_sec
+	je noChange
+	inc gametime
+	inc no_hit_count
+	mov last_sec, dh
+	noChange:
+	posicion 30, 1 
+	mov ax,gametime
+	mov number_size,4
+	call NumberToString
+	IMPRIMIR num_text
+
+
+	jmp update
+ret
+game endp
 
 start:
-mov color, 10
+	mov color, 10
 
-mov ax,@DATA
-mov ds, ax
+	mov ax,@DATA
+	mov ds, ax
 
-mov ah,00h ; Establece el modo de video
-mov al,13h ; Selecciona el modo de video
-int 10h    ; Ejecuta la interrupción de video
+	mov ah,00h ; Establece el modo de video
+	mov al,13h ; Selecciona el modo de video
+	int 10h    ; Ejecuta la interrupción de video
 
-mov ax, VIDEO_MEM
-mov es, ax
-
-
-CALL_LOAD_IMG player_iname, player_w, player_h, img_player
-CALL_LOAD_IMG obstacle_iname, obstacle_w, obstacle_h, img_obstacle
-
-mov cx,5
-mov meteor_y,0
-
-spawn_20_meteors:
-	push cx
-	SPAWN_OBSTACLE meteor_y
-	add meteor_y,10
-	pop cx
-	loop spawn_20_meteors
-
-DRAW_OBSTACLES
-
-mov ax,obstacle_ammount
-call NumberToString
-IMPRIMIR num_text
-
-; wait for any key....    
-mov ah, 10h
-int 16h
+	mov ax, VIDEO_MEM
+	mov es, ax
 
 
-mov meteor_x,294
-mov meteor_y,0
-mov vel, 1
-mov ah, 02Ch
-int 21h
-mov ultima_c, dl
-mov last_sec,dh
-update:
-mov ah, 02Ch
-int 21h
-mov ultima_c, dl
-esperar:
-	int 21h
-	cmp dl, ultima_c
-	je esperar
-mov ultima_c,0
-
-xor di, di      ; Clear DI to start from the beginning of the video segment
-mov cx, 32000   ; Number of words (64000 bytes / 2)
-mov ah,color
-mov al,color 
-rep stosw       ; Clear screen using string operation
-
-
-
-mov cx,20
-mov meteor_y,0
-mov img_address, offset img_obstacle
-mov w_address, offset obstacle_w
-mov h_address, offset obstacle_h
-draw_20_meteors:
-	push cx
-	CALL_DRAW_IMG meteor_x, meteor_y
-	add meteor_y,10
-	pop cx
-	loop draw_20_meteors
+	CALL_LOAD_IMG player_iname, player_w, player_h, img_player
+	CALL_LOAD_IMG meteor_iname, meteor_w, meteor_h, img_meteor
 	
-mov img_address, offset img_player
-mov w_address, offset player_w
-mov h_address, offset player_h
-CALL_DRAW_IMG player_x,player_y
-mov ax, vel
-cmp meteor_x,ax
-sub meteor_x,ax
-jge notOver
-mov meteor_x, 294
-add vel,2
-notOver:
-;INT 21h / AH=2Ch - get system time;
-;return: CH = hour. CL = minute. DH = second. DL = 1/100 seconds.  
-mov ah, 02Ch
-int 21h
-mov ultima_c, dl
+	call game
 
-;para minimizar el flicker se mantiene la imagen un instante
-esperar2:
-    int 21h          ; Call DOS interrupt to get time
-    cmp dl, ultima_c ; Compare current second with the last recorded second
-    je esperar2      ; Jump if equal (no second has passed)
-
-; Time has changed, update ultima_c
-mov ultima_c, dl
-cmp dh,last_sec
-je noChange
-inc gametime
-inc no_hit_count
-mov last_sec, dh
-noChange:
-posicion 30, 1 
-mov ax,gametime
-mov number_size,4
-call NumberToString
-IMPRIMIR num_text
-
-
-jmp update
-
-
-; wait for any key....    
-mov ah, 10h
-int 16h
-mov ax, 4c00h ; exit to operating system.
-int 21h 
+	exit:
+	; wait for any key....    
+	mov ah, 10h
+	int 16h
+	;exit to operating system.
+	mov ax, 4c00h 
+	int 21h 
 end
