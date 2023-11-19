@@ -2,7 +2,7 @@ DOSShell-2
 1
 Help
 proyecto
-C:\Users\jomav\OneDrive - Universidad Nacional de Costa Rica\Universidad\Semestres\Segundo año\IV Semestre\Arquitectura de computadoras\Ejercicios\ASM_ARQUITECTURA\FinalProyect\FinalProyect\EJEMPLO.EXE
+C:\Users\Angelo\Downloads\FinalProyect\FinalProyect\EJEMPLO.EXE
 
 
 
