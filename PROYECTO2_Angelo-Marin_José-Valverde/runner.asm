@@ -3,18 +3,33 @@
 .data
 
 
+;CONSTANTS
+VIDEO_MEM equ 0A000h
+
+
 
 pressEnter db "Presione ENTER para continuar...$"
 
 ultima_c db 0
 vel dw 2
+last_sec db 0
+gametime dw 0
+no_hit_count db 0
+toptimes dw 4 dup(0)
+number_size db 0
+
+obstaclex_matrix dw 320 dup(0)
+obstacley_matrix dw 320 dup(0)
+obstacle_ammount dw 0
+matrix_pointer dw 0
+px_travel_since_spawn db 0
 
 screen_w dw 320 
 screen_h dw 200  
 num_text db 5 dup('0'),10,13, '$'
 handle dw ?
 
-VIDEO_MEM equ 0A000h
+
 
 update_freq dw 25
 x dw 0
@@ -61,6 +76,45 @@ x_address dw ?
 obstacle_iname db "meteor.img",0
 ;MACROS
 
+IMPRIMIR MACRO text
+   lea dx, text
+   mov ah, 09h
+   int 21h          
+ENDM
+
+UPDATE_TIME MACRO
+
+ENDM
+
+SPAWN_OBSTACLE MACRO yPosition
+	cmp obstacle_ammount,320
+	jge nospaceavailable
+	lea di, obstaclex_matrix
+	add di, obstacle_ammount
+	mov [di],0
+	lea di, obstacley_matrix
+	add di, obstacle_ammount
+	mov [di],yPosition
+	inc obstacle_ammount
+	nospaceavailable:
+ENDM
+
+DRAW_OBSTACLES MACRO
+
+	LOAD_IMG_VARS obstacle_w,obstacle_h,img_obstacle
+	mov x_address, offset obstaclex_matrix
+	mov y_address, offset obstacley_matrix
+	mov cx,obstacle_ammount
+	drawobs_loop:
+	text cx,cx
+	jz noObstacles
+	call draw_img
+	add x_address,2
+	add y_address,2
+	loop drawobs_loop
+	noObstacles:
+ENDM
+
 ;Loads the address of img information into address variables
 CALL_LOAD_IMG MACRO imgName, imgW, imgH, img
 	lea ax, imgName
@@ -78,6 +132,11 @@ CALL_LOAD_IMG MACRO imgName, imgW, imgH, img
 	call load_img 
 ENDM
 
+LOAD_IMG_VARS MACRO imgW, imgH, img
+	mov img_address, offset img
+	mov w_address, offset imgW
+	mov h_address, offset imgH
+ENDM
 ;macro para dibujar una imagen en x,y posicion
 CALL_DRAW_IMG MACRO  xPosition,  yPosition          
 	lea ax, xPosition
@@ -125,8 +184,8 @@ NumberToString proc
 divideLoop:
     xor dx, dx          ; Clear DX for division
     div bx              ; AX / 10, quotient in AL, remainder in DX
-    add dl, '0'         ; Convert the remainder to ASCII
-    push dx ; Push remainder on stack
+    add dl, '0'         ; ASCII
+    push dx ; Remainder
 	inc cx
     test ax, ax        ; Check if quotient is zero
     jnz divideLoop
@@ -141,15 +200,15 @@ zeroNumber:
 mov [di],'0'
 inc di
 checkPadding:
-    ; Add padding spaces if necessary
-    mov bx, 3           ; Total desired length
-    sub bx, cx          ; Calculate padding needed
-    jz  setTerminator   ; Jump if no padding needed
-paddingLoop:
-    mov byte ptr [di], ' '  ; Add a space for padding
+	mov ax,di
+	sub ax, offset num_text
+
+	cmp al, number_size
+	jge setTerminator
+    mov byte ptr [di], '_'  ; Add a space for padding
     inc di
     dec bx
-    jnz paddingLoop
+    jmp checkPadding
 
 setTerminator:
     mov [di], 10
@@ -365,7 +424,10 @@ CALL_LOAD_IMG obstacle_iname, obstacle_w, obstacle_h, img_obstacle
 mov meteor_x,294
 mov meteor_y,0
 mov vel, 1
-
+mov ah, 02Ch
+int 21h
+mov ultima_c, dl
+mov last_sec,dh
 update:
 mov ah, 02Ch
 int 21h
@@ -419,21 +481,19 @@ esperar2:
     cmp dl, ultima_c ; Compare current second with the last recorded second
     je esperar2      ; Jump if equal (no second has passed)
 
-    ; Time has changed, update ultima_c
-    mov ultima_c, dl
-
-    ; Handle conversion to string and display
-    mov ax, dx
-    mov al, ah
-    mov ah, 0
-    push ax
-    posicion 30, 1  ; Assuming this sets the cursor position
-    pop ax
-    mov ah, 0
-    call NumberToString
-    mov dx, offset num_text
-    mov ah, 09h
-    int 21h          ; DOS function to display string
+; Time has changed, update ultima_c
+mov ultima_c, dl
+cmp dh,last_sec
+je noChange
+inc gametime
+inc no_hit_count
+mov last_sec, dh
+noChange:
+posicion 30, 1 
+mov ax,gametime
+mov number_size,4
+call NumberToString
+IMPRIMIR num_text
 
 
 jmp update
