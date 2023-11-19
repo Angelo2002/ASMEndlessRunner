@@ -439,16 +439,9 @@ game proc
 		pop cx
 		loop spawn_20_meteors
 	noMoreSpace:
-	MOVE_ENTITIES
-	DRAW_METEORS
+	
 
-	mov ax,meteor_ammount
-	call NumberToString
-	IMPRIMIR num_text
 
-	; wait for any key....    
-	mov ah, 10h
-	int 16h
 
 
 	mov meteor_x,294
@@ -472,27 +465,18 @@ game proc
 
 
 	CLEAR_SCREEN
-	mov cx,20
-	mov meteor_y,0
-	mov img_address, offset img_meteor
-	mov w_address, offset meteor_w
-	mov h_address, offset meteor_h
-	draw_20_meteors:
-		push cx
-		CALL_DRAW_IMG meteor_x, meteor_y
-		add meteor_y,10
-		pop cx
-		loop draw_20_meteors
+	
+	DRAW_METEORS
 		
 	mov img_address, offset img_player
 	mov w_address, offset player_w
 	mov h_address, offset player_h
 	CALL_DRAW_IMG player_x,player_y
 	mov ax, vel
-	cmp meteor_x,ax
-	sub meteor_x,ax
-	jge notOver
-	mov meteor_x, 294
+	;cmp meteor_x,ax
+	MOVE_ENTITIES
+	;jge notOver
+	;mov meteor_x, 294
 	add vel,2
 	notOver:
 	;INT 21h / AH=2Ch - get system time;
