@@ -43,7 +43,7 @@ mov ds, ax
 
 inicio:
    mov ah,00h ; Establece el modo de video
-   mov al,12h ; Selecciona el modo de video
+   mov al,13h ; Selecciona el modo de video
    int 10h    ; Ejecuta la interrupción de video
    mov ax,00  ; Configuración inicial del mouse
    int 33h    ; Inicializa el mouse
@@ -101,9 +101,9 @@ menu:
 
 juego:
    mov ah,00h ; volvemos a Establecer la parte grafica, esto hace la misma funcion que el metodo limpia que se vio en clases 
-   mov al,12h ; y es el mismo que se ejecuta al principio del codigo
+   mov al,13h ; y es el mismo que se ejecuta al principio del codigo
    int 10h 
-   
+   juego2:
     posicionNave 10,10
 
     mov ah,09h
@@ -136,7 +136,7 @@ juego:
     inc row
     notD:
 
-    jmp juego
+    jmp juego2
 
 
 ;------------------------------------------------------Salir Opción 6-------------------------------------------------------

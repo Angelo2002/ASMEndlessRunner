@@ -85,6 +85,7 @@ mov al,color
 rep stosw       ; Clear screen using string operation
 ENDM
 
+
 IMPRIMIR MACRO text
    lea dx, text
    mov ah, 09h
@@ -186,7 +187,7 @@ endm
 
 
 ;macro para ejecutar draw_rect
-DIBUJAR_RECT_DATOS MACRO xm, ym, wm, hm, cm
+CALL_DRAW_RECT MACRO xm, ym, wm, hm, cm
 	mov ax, xm
 	mov x, ax
 	mov ax, ym
@@ -263,6 +264,9 @@ waitForEnter proc
     ret
 waitForEnter endp
 
+pauseP proc
+
+pauseP endp
 
 ;proc para dibujar cuadrados
 draw_rect proc
@@ -452,6 +456,11 @@ game proc
 	mov ultima_c, dl
 	mov last_sec,dh
 	update:
+		
+	mov ah, 0ch
+	mov al, 0
+	int 21h
+	
 	mov ah, 02Ch
 	int 21h
 	mov ultima_c, dl
@@ -463,41 +472,46 @@ game proc
 
 
 
-
+	mov color,0
 	CLEAR_SCREEN
 	
 	DRAW_METEORS
-		
+	
 	mov img_address, offset img_player
 	mov w_address, offset player_w
 	mov h_address, offset player_h
 	CALL_DRAW_IMG player_x,player_y
-	mov ax, vel
-	;cmp meteor_x,ax
+	
+
 	MOVE_ENTITIES
 	;jge notOver
 	;mov meteor_x, 294
-	add vel,2
+	
 	notOver:
+	
 	;INT 21h / AH=2Ch - get system time;
 	;return: CH = hour. CL = minute. DH = second. DL = 1/100 seconds.  
 	mov ah, 02Ch
 	int 21h
 	mov ultima_c, dl
-
+	
 	;para minimizar el flicker se mantiene la imagen un instante
 	esperar2:
-		int 21h          ; Call DOS interrupt to get time
-		cmp dl, ultima_c ; Compare current second with the last recorded second
-		je esperar2      ; Jump if equal (no second has passed)
+		
+		mov ah,02Ch
+		int 21h          
+		cmp dl, ultima_c 
+		je esperar2      ; Jump if equal (no centisecond has passed)
 
 	; Time has changed, update ultima_c
 	mov ultima_c, dl
 	cmp dh,last_sec
-	je noChange
+	je noChange ;seconds, not centiseconds*
+	
 	inc gametime
 	inc no_hit_count
 	mov last_sec, dh
+	
 	noChange:
 	posicion 30, 1 
 	mov ax,gametime
@@ -505,7 +519,54 @@ game proc
 	call NumberToString
 	IMPRIMIR num_text
 
-
+	
+	; se lee el bufer del teclado para mover la nave
+	mov ah, 01h
+	int 16h
+	jz updateAux
+	cmp al, 's'
+	je  movShipDown 
+	cmp al, 'S'
+	je  movShipDown
+	cmp al, 'w'
+	je  movShipUp
+	cmp al, 'W'
+	je  movShipUp
+	updateAux:
+    jmp update
+	movShipDown:
+           ;primero borrar la imagen anterior
+            CALL_DRAW_RECT player_x, player_y, player_w, player_h, 0
+            mov ax, player_y
+            add ax, 15
+            cmp ax, 170
+            jle dibujarShipDown
+            
+            mov ax, 170
+            dibujarShipDown:
+                mov player_y, ax
+                mov player_x, 0
+                LOAD_IMG_VARS player_w, player_h, img_player
+                CALL_DRAW_IMG player_x, player_y 
+        jmp update
+        
+        movShipUp:
+           ;primero borrar la imagen anterior
+            CALL_DRAW_RECT player_x, player_y, player_w, player_h, 0
+             mov ax, player_y
+            sub ax,15
+            cmp ax, 0
+            jge dibujarShipUp        
+            
+            mov ax, 0
+                
+            dibujarShipUp:
+				mov player_y, ax
+                mov player_x, 0
+                LOAD_IMG_VARS player_w, player_h, img_player
+                CALL_DRAW_IMG player_x, player_y 
+            
+	
 	jmp update
 ret
 game endp
