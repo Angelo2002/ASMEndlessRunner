@@ -83,34 +83,38 @@ IMPRIMIR MACRO text
 ENDM
 
 UPDATE_TIME MACRO
-
+	add cx,1
 ENDM
 
 SPAWN_OBSTACLE MACRO yPosition
-	cmp obstacle_ammount,320
-	jge nospaceavailable
+	;cantidad??
+	
 	lea di, obstaclex_matrix
-	add di, obstacle_ammount
-	mov [di],0
+	mov ax, obstacle_ammount
+	shl ax,1
+	add di,ax
+	mov [di],300
 	lea di, obstacley_matrix
-	add di, obstacle_ammount
-	mov [di],yPosition
+	add di, ax
+	mov bx, yPosition
+	mov [di],bx
 	inc obstacle_ammount
-	nospaceavailable:
+
 ENDM
 
 DRAW_OBSTACLES MACRO
-
 	LOAD_IMG_VARS obstacle_w,obstacle_h,img_obstacle
 	mov x_address, offset obstaclex_matrix
 	mov y_address, offset obstacley_matrix
 	mov cx,obstacle_ammount
 	drawobs_loop:
-	text cx,cx
+	test cx,cx
 	jz noObstacles
+	push cx
 	call draw_img
 	add x_address,2
 	add y_address,2
+	pop cx
 	loop drawobs_loop
 	noObstacles:
 ENDM
@@ -375,10 +379,18 @@ draw_img proc
 	mov di, y_address
 	mov dx, [di]  ; dx <- posicion y de la imagen (calcular linea)
 	mov pos_y, dx
-	mov bx, 0
+	mov bx, 0 ; <-recorrido en X
 	ciclo_draw_img:
+		;ignorar color 0
 		cmp [si], 0
 		je pint_sig_px
+		;verificar limite de pantalla
+		mov ax,bx
+		mov di,x_address
+		add ax,[di]
+		cmp ax,screen_w
+		jge pint_sig_px
+		
 		mov ax, pos_y
 		mul screen_w
 		mov di, x_address
@@ -392,8 +404,7 @@ draw_img proc
 			inc bx
 			inc si
 			mov di, w_address
-			mov ax, [di]
-			cmp bx, ax
+			cmp bx, [di]
 			jne continuar_loop
 			mov bx, 0
 			inc pos_y
@@ -419,6 +430,26 @@ mov es, ax
 
 CALL_LOAD_IMG player_iname, player_w, player_h, img_player
 CALL_LOAD_IMG obstacle_iname, obstacle_w, obstacle_h, img_obstacle
+
+mov cx,5
+mov meteor_y,0
+
+spawn_20_meteors:
+	push cx
+	SPAWN_OBSTACLE meteor_y
+	add meteor_y,10
+	pop cx
+	loop spawn_20_meteors
+
+DRAW_OBSTACLES
+
+mov ax,obstacle_ammount
+call NumberToString
+IMPRIMIR num_text
+
+; wait for any key....    
+mov ah, 10h
+int 16h
 
 
 mov meteor_x,294
