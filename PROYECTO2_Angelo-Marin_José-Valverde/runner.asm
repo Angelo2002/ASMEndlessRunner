@@ -117,11 +117,11 @@ jmp start
 
 
 NumberToString proc
-    lea di, num_text      ; Load the address of the buffer
+	xor cx,cx			;How many numbers have been written
+    lea di, num_text      
     cmp ax, 0           ; Check if AX is 0
     je zeroNumber
     mov bx, 10          ; BX = 10 for division        
-	mov cx,0
 divideLoop:
     xor dx, dx          ; Clear DX for division
     div bx              ; AX / 10, quotient in AL, remainder in DX
@@ -414,11 +414,28 @@ int 21h
 mov ultima_c, dl
 
 ;para minimizar el flicker se mantiene la imagen un instante
-esperar2: 
-	int 21h
-	cmp dl, ultima_c
-	je esperar2
-mov ultima_c,0
+esperar2:
+    int 21h          ; Call DOS interrupt to get time
+    cmp dl, ultima_c ; Compare current second with the last recorded second
+    je esperar2      ; Jump if equal (no second has passed)
+
+    ; Time has changed, update ultima_c
+    mov ultima_c, dl
+
+    ; Handle conversion to string and display
+    mov ax, dx
+    mov al, ah
+    mov ah, 0
+    push ax
+    posicion 30, 1  ; Assuming this sets the cursor position
+    pop ax
+    mov ah, 0
+    call NumberToString
+    mov dx, offset num_text
+    mov ah, 09h
+    int 21h          ; DOS function to display string
+
+
 jmp update
 
 
