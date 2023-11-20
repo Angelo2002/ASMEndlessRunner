@@ -5,11 +5,19 @@
 
 ;CONSTANTS
 VIDEO_MEM equ 0A000h
-PUSHA equ push ax bx cx dx
+PUSHALL equ push ax bx cx dx
+POPALL equ pop dx cx bx ax
 
+UP_LIMIT equ 10
+BOT_LIMIT equ 190
+
+player_bot_limit dw 0
 
 pressEntermsg db "Presione ENTER para continuar...$"
-errLoading db "Hubo un error al cargar los datos de imagen. Saliendo$"
+errLoading db "Error al cargar los sprites. Saliendo$"
+vidasmsg db "Vid:$"
+segundosmsg db "Seg:$"
+nivmsg db "Niv:$"
 
 ultima_c db 0
 vel dw 2
@@ -18,12 +26,19 @@ gametime dw 0
 no_hit_count db 0
 toptimes dw 4 dup(0)
 number_size db 0
+lives db 0
+
 
 metx_matrix dw 320 dup(0)
 mety_matrix dw 320 dup(0)
 meteor_ammount dw 0
-matrix_pointer dw 0
+;matrix_pointer dw 0
 px_travel_since_spawn db 0
+
+x_mat_address dw ?
+y_mat_address dw ?
+entity_amm_address dw ?
+despawn_amm dw 0
 
 screen_w dw 320 
 screen_h dw 200  
@@ -96,20 +111,22 @@ UPDATE_TIME MACRO
 	add cx,1
 ENDM
 
-SPAWN_ENTITY MACRO yPosition,EXMatrix,EYMatrix,ECounter,skipLabel
-	cmp ECounter,320
-	jge skipLabel
-	lea di, EXMatrix
-	mov ax, ECounter
-	shl ax,1
-	add di,ax
-	mov [di],300
-	lea di, EYMatrix
-	add di, ax
-	mov bx, yPosition
-	mov [di],bx
-	inc ECounter
+CALL_SPAWN_ENTITY MACRO yPosition,EXMatrix,EYMatrix,ECounter
+	mov entity_amm_address, offset ECounter
+	mov x_mat_address, offset EXMatrix
+	mov y_mat_address, offset EYMatrix
+	mov ax, yPosition
+	mov pos_y, ax
+	call spawn_ent
+ENDM
 
+
+
+CALL_DESPAWN MACRO EXMatrix,EYMatrix,ECounter
+	mov x_mat_address, offset EXMatrix
+	mov y_mat_address, offset EYMatrix
+	mov entity_amm_address, offset ECounter
+	call despawnEntities
 ENDM
 
 DRAW_METEORS MACRO
@@ -137,11 +154,12 @@ MOVE_ENTITIES MACRO
 	moveMet_loop:
 	mov ax,[di]
 	sub ax,vel
-	cmp ax,vel
-	jge dontCheckCol
-	;check collision
-	dontCheckCol:
+	cmp ax,0
+	jge moveMeteor
+	mov ax,0
+	moveMeteor:
 	mov [di],ax
+	
 	add di,2
 	loop moveMet_loop
 	endOfMeteors:
@@ -202,11 +220,60 @@ CALL_DRAW_RECT MACRO xm, ym, wm, hm, cm
 ENDM
 
 .code
+mov ax,@DATA
+mov ds, ax
+
 jmp start
 
+spawn_ent proc
+	mov di, entity_amm_address
+	mov ax, [di]
+	inc [di]
+	shl ax,1
+	mov di, x_mat_address
+	add di,ax
+	mov [di],300
+	mov di, y_mat_address
+	add di, ax
+	mov bx, pos_y
+	mov [di],bx
+	ret
+spawn_ent endp
+
+despawnEntities proc
+	mov di, entity_amm_address
+	mov cx,[di]
+	sub cx, despawn_amm
+	mov [di], cx
+	mov di, x_mat_address
+	mov si,di
+	add si,despawn_amm
+	add si,despawn_amm
+	push cx
+	shiftXMat:
+	mov dx,[si]
+	mov [di],dx
+	add si,2
+	add di,2
+	loop shiftXMat
+	pop cx
+	
+	mov di, y_mat_address
+	mov si,di
+	add si,despawn_amm
+	add si,despawn_amm
+	shiftYMat:
+	mov dx,[si]
+	mov [di],dx
+	add si,2
+	add di,2
+	loop shiftYMat
+ret
+despawnEntities endp
 
 
 NumberToString proc
+	push cx
 	xor cx,cx			;How many numbers have been written
     lea di, num_text      
     cmp ax, 0           ; Check if AX is 0
@@ -245,6 +312,7 @@ setTerminator:
     mov [di], 10
 	mov [di+1],13
 	mov [di+2], '$'
+	pop cx
     ret
 NumberToString endp
 
@@ -265,7 +333,22 @@ waitForEnter proc
 waitForEnter endp
 
 pauseP proc
-
+PauseLoop:
+	;Limpiar buffer
+	mov ah, 0ch
+	mov al, 0
+	int 21h
+	;obtener tecla
+	mov ah, 01h
+	int 16h
+	jz PauseLoop
+	cmp al,'P'
+	je exitPause
+	cmp al,'p'
+	je exitPause
+	jmp PauseLoop
+	exitPause:
+	ret
 pauseP endp
 
 ;proc para dibujar cuadrados
@@ -433,23 +516,34 @@ endp
 
 game proc
 
-	mov cx,5
+	mov ax, BOT_LIMIT
+	sub ax, player_h
+	mov player_bot_limit,ax
+	mov cx,20
 	mov meteor_y,0
-
+	
 	spawn_20_meteors:
 		push cx
-		SPAWN_ENTITY meteor_y,metx_matrix,mety_matrix,meteor_ammount,noMoreSpace
+		CALL_SPAWN_ENTITY meteor_y,metx_matrix,mety_matrix,meteor_ammount
 		add meteor_y,10
 		pop cx
 		loop spawn_20_meteors
-	noMoreSpace:
+	
 	
 
+	
+	mov despawn_amm,1
 
 
+	
+	
+	CALL_DESPAWN metx_matrix,mety_matrix,meteor_ammount
+	
+	
 
-	mov meteor_x,294
+	mov meteor_x,200
 	mov meteor_y,0
+	
 	mov vel, 1
 	mov ah, 02Ch
 	int 21h
@@ -457,6 +551,7 @@ game proc
 	mov last_sec,dh
 	update:
 		
+	;Limpia el buffer de entrada (teclado)
 	mov ah, 0ch
 	mov al, 0
 	int 21h
@@ -484,8 +579,6 @@ game proc
 	
 
 	MOVE_ENTITIES
-	;jge notOver
-	;mov meteor_x, 294
 	
 	notOver:
 	
@@ -513,10 +606,11 @@ game proc
 	mov last_sec, dh
 	
 	noChange:
-	posicion 30, 1 
+	posicion 0, 0 
 	mov ax,gametime
 	mov number_size,4
 	call NumberToString
+	IMPRIMIR segundosmsg
 	IMPRIMIR num_text
 
 	
@@ -532,17 +626,25 @@ game proc
 	je  movShipUp
 	cmp al, 'W'
 	je  movShipUp
+	cmp al, 'P'
+	je  callPause
+	cmp al, 'p'
+	je  callPause
 	updateAux:
     jmp update
+	
+	callPause:
+		call pauseP
+		jmp update
 	movShipDown:
            ;primero borrar la imagen anterior
             CALL_DRAW_RECT player_x, player_y, player_w, player_h, 0
             mov ax, player_y
             add ax, 15
-            cmp ax, 170
+            cmp ax, player_bot_limit
             jle dibujarShipDown
             
-            mov ax, 170
+            mov ax, player_bot_limit
             dibujarShipDown:
                 mov player_y, ax
                 mov player_x, 0
@@ -551,43 +653,43 @@ game proc
         jmp update
         
         movShipUp:
+		CALL_DESPAWN metx_matrix,mety_matrix,meteor_ammount
            ;primero borrar la imagen anterior
             CALL_DRAW_RECT player_x, player_y, player_w, player_h, 0
              mov ax, player_y
             sub ax,15
-            cmp ax, 0
+            cmp ax, UP_LIMIT
             jge dibujarShipUp        
             
-            mov ax, 0
-                
+            mov ax, UP_LIMIT
+           
             dibujarShipUp:
 				mov player_y, ax
                 mov player_x, 0
                 LOAD_IMG_VARS player_w, player_h, img_player
                 CALL_DRAW_IMG player_x, player_y 
-            
-	
-	jmp update
+			jmp update
+			
 ret
 game endp
 
 start:
+
 	mov color, 10
+	
 
-	mov ax,@DATA
-	mov ds, ax
-
+	
 	mov ah,00h ; Establece el modo de video
 	mov al,13h ; Selecciona el modo de video
 	int 10h    ; Ejecuta la interrupción de video
-
+	
 	mov ax, VIDEO_MEM
 	mov es, ax
 
-
+	
 	CALL_LOAD_IMG player_iname, player_w, player_h, img_player
 	CALL_LOAD_IMG meteor_iname, meteor_w, meteor_h, img_meteor
-	
+	;implementar menu
 	call game
 
 	exit:
