@@ -28,12 +28,12 @@ toptimes dw 4 dup(0)
 number_size db 0
 lives db 0
 
-
+pattern dw 18 dup(1001000000000001b)
 metx_matrix dw 320 dup(0)
 mety_matrix dw 320 dup(0)
 meteor_ammount dw 0
 ;matrix_pointer dw 0
-px_travel_since_spawn db 0
+px_travel_since_spawn dw 20
 
 x_mat_address dw ?
 y_mat_address dw ?
@@ -147,23 +147,68 @@ DRAW_METEORS MACRO
 ENDM
 
 MOVE_ENTITIES MACRO
+	mov despawn_amm,0
 	lea di,metx_matrix
 	mov cx,meteor_ammount
 	test cx,cx
 	jz endOfMeteors
 	moveMet_loop:
 	mov ax,[di]
+	cmp ax,0 ;Ya llego al final
+	je incDespawn
 	sub ax,vel
 	cmp ax,0
 	jge moveMeteor
 	mov ax,0
 	moveMeteor:
 	mov [di],ax
-	
+	jmp dontIncDespawn
+	incDespawn:
+	inc despawn_amm
+	dontIncDespawn:
 	add di,2
 	loop moveMet_loop
+	cmp despawn_amm,0
+	je endOfMeteors
+	CALL_DESPAWN metx_matrix,mety_matrix,meteor_ammount
 	endOfMeteors:
 ENDM
+
+
+SPAWN_ENT_PREP MACRO yPosition,EXMatrix,EYMatrix,ECounter
+	mov entity_amm_address, offset ECounter
+	mov x_mat_address, offset EXMatrix
+	mov y_mat_address, offset EYMatrix
+	mov ax, yPosition
+	mov pos_y, ax
+ENDM
+
+SPAWN_NEWCOL MACRO
+	cmp px_travel_since_spawn,20
+	jl spawnNotReady
+	sub px_travel_since_spawn,20
+	lea si, pattern
+	
+	SPAWN_ENT_PREP 20, metx_matrix, mety_matrix, meteor_ammount
+	mov bx,20
+	mov cx,18
+	spawnMeteorLoop:
+		push cx
+		push bx
+		mov pos_y,bx
+		ROL word ptr [si],1
+		jnc dontSpawnMet
+		call spawn_ent
+		dontSpawnMet:
+		pop bx
+		add bx,20
+		inc si
+		inc si
+		pop cx
+		loop spawnMeteorLoop
+	spawnNotReady:
+ENDM
+
 ;Loads the address of img information into address variables
 CALL_LOAD_IMG MACRO imgName, imgW, imgH, img
 	lea ax, imgName
@@ -232,9 +277,12 @@ spawn_ent proc
 	shl ax,1
 	mov di, x_mat_address
 	add di,ax
-	mov [di],300
+	mov bx,320
+	sub bx, px_travel_since_spawn ;calcular posicion donde debería aparecer el meteoro
+	mov [di],bx
 	mov di, y_mat_address
 	add di, ax
+
 	mov bx, pos_y
 	mov [di],bx
 	ret
@@ -249,6 +297,8 @@ despawnEntities proc
 	mov si,di
 	add si,despawn_amm
 	add si,despawn_amm
+	test cx,cx
+	jz despawnCompleted
 	push cx
 	shiftXMat:
 	mov dx,[si]
@@ -268,6 +318,7 @@ despawnEntities proc
 	add si,2
 	add di,2
 	loop shiftYMat
+	despawnCompleted:
 ret
 despawnEntities endp
 
@@ -519,32 +570,13 @@ game proc
 	mov ax, BOT_LIMIT
 	sub ax, player_h
 	mov player_bot_limit,ax
-	mov cx,20
-	mov meteor_y,0
+	mov meteor_ammount,0
+	mov px_travel_since_spawn,20
 	
-	spawn_20_meteors:
-		push cx
-		CALL_SPAWN_ENTITY meteor_y,metx_matrix,mety_matrix,meteor_ammount
-		add meteor_y,10
-		pop cx
-		loop spawn_20_meteors
-	
-	
-
-	
-	mov despawn_amm,1
 
 
 	
-	
-	CALL_DESPAWN metx_matrix,mety_matrix,meteor_ammount
-	
-	
-
-	mov meteor_x,200
-	mov meteor_y,0
-	
-	mov vel, 1
+	mov vel, 2
 	mov ah, 02Ch
 	int 21h
 	mov ultima_c, dl
@@ -570,17 +602,44 @@ game proc
 	mov color,0
 	CLEAR_SCREEN
 	
-	DRAW_METEORS
-	
-	mov img_address, offset img_player
-	mov w_address, offset player_w
-	mov h_address, offset player_h
+	LOAD_IMG_VARS player_w,player_h, img_player
 	CALL_DRAW_IMG player_x,player_y
+	;REEMP CON MACRO
+	cmp px_travel_since_spawn,20
+	jl spawnNotReady
+	sub px_travel_since_spawn,20
+	lea si, pattern
+	
+	;SPAWN_ENT_PREP 20, metx_matrix, mety_matrix, meteor_ammount
+
+	mov cx,18
+	mov meteor_y,10
+	spawnMeteorLoop:
+		push cx
+	
+		ROL word ptr [si],1
+		
+		jnc dontSpawnMet
+	
+		;call spawn_ent
+		CALL_SPAWN_ENTITY meteor_y,metx_matrix,mety_matrix,meteor_ammount
+	
+		dontSpawnMet:
+		add meteor_y,10
+		inc si
+		inc si
+		pop cx
+		loop spawnMeteorLoop
+	spawnNotReady:
+	;FIN MACRO
+	DRAW_METEORS
 	
 
 	MOVE_ENTITIES
 	
-	notOver:
+	mov ax,vel
+	add px_travel_since_spawn, ax
+	
 	
 	;INT 21h / AH=2Ch - get system time;
 	;return: CH = hour. CL = minute. DH = second. DL = 1/100 seconds.  
@@ -637,6 +696,7 @@ game proc
 		call pauseP
 		jmp update
 	movShipDown:
+	
            ;primero borrar la imagen anterior
             CALL_DRAW_RECT player_x, player_y, player_w, player_h, 0
             mov ax, player_y
@@ -653,10 +713,11 @@ game proc
         jmp update
         
         movShipUp:
-		CALL_DESPAWN metx_matrix,mety_matrix,meteor_ammount
            ;primero borrar la imagen anterior
+		   mov meteor_y, 50
+			CALL_SPAWN_ENTITY meteor_y,metx_matrix,mety_matrix,meteor_ammount
             CALL_DRAW_RECT player_x, player_y, player_w, player_h, 0
-             mov ax, player_y
+            mov ax, player_y
             sub ax,15
             cmp ax, UP_LIMIT
             jge dibujarShipUp        
@@ -677,15 +738,12 @@ start:
 
 	mov color, 10
 	
-
-	
 	mov ah,00h ; Establece el modo de video
 	mov al,13h ; Selecciona el modo de video
 	int 10h    ; Ejecuta la interrupción de video
 	
 	mov ax, VIDEO_MEM
 	mov es, ax
-
 	
 	CALL_LOAD_IMG player_iname, player_w, player_h, img_player
 	CALL_LOAD_IMG meteor_iname, meteor_w, meteor_h, img_meteor
