@@ -13,14 +13,11 @@ BOT_LIMIT equ 190
 flag db 0
 player_bot_limit dw 0
 
-
-patternFileName db "patron.txt$", 20 dup(0) ;espacio extra
+patternFileName db "patron.txt", 20 dup(0) ;espacio extra
 wordBuffer dw ?
 byteBuffer db 0,'$'
 bitCounter db 0
 wordCounter db 0
-
-player db "JUGADOR$", 20 dup(0) ;espacio extra
 
 prompt db "Ingrese el nombre del archivo:" , 10, 13, "$"
 pressEntermsg db "Presione ENTER para continuar...$"
@@ -735,7 +732,7 @@ askFileName proc
 	mov ah, 09h
 	lea dx, prompt
 	int 21h
-	mov si, filename_address
+	mov si, offset patternFileName
 	waitForInput:
 		mov ah, 01h
 		int 16h
@@ -755,7 +752,7 @@ askFileName proc
 		jmp askFileNameScreen
 		
 		backspace:
-			cmp si, filename_address
+			cmp si, offset patternFileName
 			je waitForInput
 
 			dec si
@@ -771,7 +768,7 @@ askFileName proc
 		mov ah, 09h
 		lea dx, prompt
 		int 21h
-		lea dx, filename_address
+		lea dx, patternFileName
 		int 21h
 		
 
@@ -942,12 +939,11 @@ start:
 	
 	CALL_LOAD_IMG player_iname, player_w, player_h, img_player
 	CALL_LOAD_IMG meteor_iname, meteor_w, meteor_h, img_meteor
-	
-	
+	;implementar menu
 	IMPRIMIR about
 	IMPRIMIR pressPmsg
 	call pauseP
-	mov filename_address, offset patternFileName
+	
 	call askFileName
 	call read_file
 	call game
