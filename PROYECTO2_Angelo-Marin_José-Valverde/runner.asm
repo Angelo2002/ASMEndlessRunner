@@ -13,6 +13,13 @@ BOT_LIMIT equ 190
 
 player_bot_limit dw 0
 
+patternFileName db "patron.txt", 20 dup(0) ;espacio extra
+wordBuffer dw ?
+byteBuffer db 0,'$'
+bitCounter db 0
+wordCounter db 0
+
+prompt db "Ingrese el nombre del archivo:" , 10, 13, "$"
 pressEntermsg db "Presione ENTER para continuar...$"
 errLoading db "Error al cargar los sprites. Saliendo$"
 vidasmsg db "Vid:$"
@@ -28,7 +35,7 @@ toptimes dw 4 dup(0)
 number_size db 0
 lives db 0
 
-pattern dw 18 dup(1001000000000001b)
+pattern dw 18 dup(1100000000000000b)
 metx_matrix dw 320 dup(0)
 mety_matrix dw 320 dup(0)
 meteor_ammount dw 0
@@ -565,8 +572,155 @@ draw_img proc
 	ret    
 endp
 
+read_file PROC
+	mov filename_address, offset patternFileName
+	
+	call open_file
+	lea di, pattern
+    mov bitCounter,0
+	mov wordCounter,0
+	
+	mov al, 0
+	mov bx, handle
+	mov cx, 0
+	mov dx, 0
+	mov ah, 42h
+	int 21h 
+	jc errorRead
+	lea si, byteBuffer
+    next_char:
+        mov ah, 3Fh      
+        mov cx, 1        ; Read one character
+		mov bx, handle
+        lea dx, [si]   
+        int 21h
+		jc errorRead
+        cmp ax, 0        ; Check if EOF
+        je notEnough     ; Jump to notEnough if EOF
+		mov bl, [si]
+        cmp bl, '1'
+        je bit_is_one
+        cmp bl, '0'
+        je bit_is_zero
+        cmp bl, 13 ; End-of-line 
+        je next_word
+		
+		jmp next_char
+		notEnough:
+		
+			jmp exit
+		errorRead:
+			IMPRIMIR errLoading
+			jmp exit
+			
+    bit_is_one:
+		mov wordBuffer,1 
+		mov cl, bitCounter
+		SHL word ptr wordBuffer, cl
+		mov ax, wordBuffer
+		OR [di],ax
+        jmp next_bit
+
+    bit_is_zero:
+		mov wordBuffer,1 
+		mov cl, bitCounter
+		SHL word ptr wordBuffer, cl
+		mov ax, wordBuffer
+		NOT ax ;invertir
+		AND [di],ax
+		
+        jmp next_bit
+
+    next_word:
+        inc wordCounter           ; Move to the next word
+		inc di
+		inc di
+        mov bitCounter,0         ; Reset bit counter
+        jmp next_char   ; Read next character
+
+    next_bit:
+        inc bitCounter           ; Increment bit counter
+        cmp bitCounter, 16       ; Check if all bits in the word are set
+        jl next_charAux
+        inc wordCounter           ; Move to the next word
+        mov bitCounter,0      ; Reset bit counter
+        cmp wordCounter, 18       ; Check if all words are filled
+        jge closeF
+		next_charAux:
+		jmp next_char
+	closeF:
+    call close_file
+    ret
+
+
+	
+read_file ENDP
+
+
+
+askFileName proc
+	
+	;mostrar en pantalla
+	mov ah,00h 
+	mov al,12h 
+	int 10h 
+	posicion 1, 1 
+	mov ah, 09h
+	lea dx, prompt
+	int 21h
+	mov si, offset patternFileName
+	waitForInput:
+		mov ah, 01h
+		int 16h
+		jz waitForInput
+		mov ah, 00h
+		int 16h
+		
+		cmp al, 0Dh ; ENTER key
+		je inputRetrieved
+		
+		cmp al, 08h
+		je backspace
+		
+        mov byte ptr [si], al ;añade caracter
+		mov byte ptr [si+1],'$'
+        inc si 
+		jmp askFileNameScreen
+		
+		backspace:
+			cmp si, offset patternFileName
+			je waitForInput
+
+			dec si
+			mov byte ptr [si],'$'
+		
+		askFileNameScreen:
+		
+		;mostrar en pantalla
+		mov ah,00h 
+		mov al,12h 
+		int 10h 
+		posicion 1, 1 
+		mov ah, 09h
+		lea dx, prompt
+		int 21h
+		lea dx, patternFileName
+		int 21h
+		
+
+        jmp waitForInput
+
+	inputRetrieved:
+    ret
+askFileName endp
+
+
 game proc
 
+	mov ah,00h ; Establece el modo de video
+	mov al,13h ; Selecciona el modo de video
+	int 10h    ; Ejecuta la interrupción de video
+	
 	mov ax, BOT_LIMIT
 	sub ax, player_h
 	mov player_bot_limit,ax
@@ -748,6 +902,9 @@ start:
 	CALL_LOAD_IMG player_iname, player_w, player_h, img_player
 	CALL_LOAD_IMG meteor_iname, meteor_w, meteor_h, img_meteor
 	;implementar menu
+	
+	call askFileName
+	call read_file
 	call game
 
 	exit:
