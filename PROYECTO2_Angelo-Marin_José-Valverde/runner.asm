@@ -29,6 +29,7 @@ about db "Proyecto de: Ángelo Marín y José Valverde. Este juego se basa en un
 pressPmsg db "Presione P para continuar...$"
 ultima_c db 0
 vel dw 2
+level dw 0
 last_sec db 0
 gametime dw 0
 no_hit_count db 0
@@ -298,18 +299,24 @@ check_collision proc
 	mov flag,0
 	mov si, x_mat_address
 	mov di, entity_amm_address
-	mov cx, [di]
-	mov ax,player_w
+	mov cx, 0
+	mov bx,[di]
+	mov di, y_mat_address
 	checkColLoop:
+	cmp cx,bx
+	jge finishedCol
+	mov ax,player_w
 	cmp ax,[si]
 	jl finishedCol
-	mov x_address,si
+	mov y_address, di
 	call check_single_collision
 	cmp flag,1
 	je finishedCol
 	inc si
 	inc si
-	loop checkColLoop
+	inc di
+	inc di
+	jmp checkColLoop
 	finishedCol:
 	ret
 check_collision endp
@@ -319,12 +326,12 @@ check_single_collision proc
 	 mov di, y_address
 	 mov ax,[di]
 	 mov bx, player_y
-	 mov dx, cx
+	 mov dx, bx
 	 add dx, player_h
 	 cmp ax,bx
 	 jl secondway
      cmp ax,dx
-	 jg no_colition
+	 jle colition
 	 
 	 secondway:
 	 add ax,meteor_h
@@ -790,11 +797,10 @@ game proc
 	mov player_bot_limit,ax
 	mov meteor_ammount,0
 	mov px_travel_since_spawn,20
-	
-
-
-	
-	mov vel, 10
+	mov lives, 3
+	mov ax, level
+	shl ax,1
+	mov vel,ax
 	mov ah, 02Ch
 	int 21h
 	mov ultima_c, dl
@@ -818,14 +824,18 @@ game proc
 
 
 	mov color,0
+	
 	CLEAR_SCREEN
-
+	CALL_CHECK_COLLISION metx_matrix,mety_matrix,meteor_ammount
+	cmp flag,1
+	jne notPause
+	;codigo de colision
 	notPause:
 	LOAD_IMG_VARS player_w,player_h, img_player
 	CALL_DRAW_IMG player_x,player_y
 	SPAWN_NEWCOL
 	DRAW_METEORS
-	
+
 
 	MOVE_ENTITIES
 	
@@ -946,6 +956,7 @@ start:
 	
 	call askFileName
 	call read_file
+	mov level,5
 	call game
 
 	exit:
