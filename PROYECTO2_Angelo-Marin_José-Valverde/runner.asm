@@ -10,22 +10,26 @@ POPALL equ pop dx cx bx ax
 
 UP_LIMIT equ 10
 BOT_LIMIT equ 190
-
+flag db 0
 player_bot_limit dw 0
 
-patternFileName db "patron.txt", 20 dup(0) ;espacio extra
+
+patternFileName db "patron.txt$", 20 dup(0) ;espacio extra
 wordBuffer dw ?
 byteBuffer db 0,'$'
 bitCounter db 0
 wordCounter db 0
 
+player db "JUGADOR$", 20 dup(0) ;espacio extra
+
 prompt db "Ingrese el nombre del archivo:" , 10, 13, "$"
 pressEntermsg db "Presione ENTER para continuar...$"
 errLoading db "Error al cargar los sprites. Saliendo$"
-vidasmsg db "Vid:$"
+livesmsg db "Vid:$"
 segundosmsg db "Seg:$"
 nivmsg db "Niv:$"
-
+about db "Proyecto de: Ángelo Marín y José Valverde. Este juego se basa en una nave la cual debe esquivar meteoritos que aparecerán durante toda la partida, la dificultad ira subiendo durante la partida según el tiempo jugado. El objetivo el juego es durar la mayor cantidad de tiempo sin perder las 3 vidas.$"
+pressPmsg db "Presione P para continuar...$"
 ultima_c db 0
 vel dw 2
 last_sec db 0
@@ -39,6 +43,9 @@ pattern dw 18 dup(1100000000000000b)
 metx_matrix dw 320 dup(0)
 mety_matrix dw 320 dup(0)
 meteor_ammount dw 0
+
+
+
 ;matrix_pointer dw 0
 px_travel_since_spawn dw 20
 
@@ -136,6 +143,15 @@ CALL_DESPAWN MACRO EXMatrix,EYMatrix,ECounter
 	call despawnEntities
 ENDM
 
+CALL_CHECK_COLLISION MACRO EXMatrix,EYMatrix,ECounter
+	mov x_mat_address, offset EXMatrix
+	mov y_mat_address, offset EYMatrix
+	mov entity_amm_address, offset ECounter
+	call check_collision
+ENDM
+
+
+
 DRAW_METEORS MACRO
 	LOAD_IMG_VARS meteor_w,meteor_h,img_meteor
 	mov x_address, offset metx_matrix
@@ -196,19 +212,22 @@ SPAWN_NEWCOL MACRO
 	sub px_travel_since_spawn,20
 	lea si, pattern
 	
-	SPAWN_ENT_PREP 20, metx_matrix, mety_matrix, meteor_ammount
-	mov bx,20
+	;SPAWN_ENT_PREP 20, metx_matrix, mety_matrix, meteor_ammount
+
 	mov cx,18
+	mov meteor_y,10
 	spawnMeteorLoop:
 		push cx
-		push bx
-		mov pos_y,bx
+	
 		ROL word ptr [si],1
+		
 		jnc dontSpawnMet
-		call spawn_ent
+	
+		;call spawn_ent
+		CALL_SPAWN_ENTITY meteor_y,metx_matrix,mety_matrix,meteor_ammount
+	
 		dontSpawnMet:
-		pop bx
-		add bx,20
+		add meteor_y,10
 		inc si
 		inc si
 		pop cx
@@ -276,6 +295,54 @@ mov ax,@DATA
 mov ds, ax
 
 jmp start
+
+
+check_collision proc
+	mov flag,0
+	mov si, x_mat_address
+	mov di, entity_amm_address
+	mov cx, [di]
+	mov ax,player_w
+	checkColLoop:
+	cmp ax,[si]
+	jl finishedCol
+	mov x_address,si
+	call check_single_collision
+	cmp flag,1
+	je finishedCol
+	inc si
+	inc si
+	loop checkColLoop
+	finishedCol:
+	ret
+check_collision endp
+
+check_single_collision proc
+	 ;obstaculo = ax
+	 mov di, y_address
+	 mov ax,[di]
+	 mov bx, player_y
+	 mov dx, cx
+	 add dx, player_h
+	 cmp ax,bx
+	 jl secondway
+     cmp ax,dx
+	 jg no_colition
+	 
+	 secondway:
+	 add ax,meteor_h
+	 cmp ax,bx
+	 jl no_colition
+	 cmp ax,dx
+	 jg no_colition
+	 colition:
+	 mov flag, 1
+	 
+	 no_colition:
+	 ret
+check_single_collision endp
+
+
 
 spawn_ent proc
 	mov di, entity_amm_address
@@ -668,7 +735,7 @@ askFileName proc
 	mov ah, 09h
 	lea dx, prompt
 	int 21h
-	mov si, offset patternFileName
+	mov si, filename_address
 	waitForInput:
 		mov ah, 01h
 		int 16h
@@ -688,7 +755,7 @@ askFileName proc
 		jmp askFileNameScreen
 		
 		backspace:
-			cmp si, offset patternFileName
+			cmp si, filename_address
 			je waitForInput
 
 			dec si
@@ -704,7 +771,7 @@ askFileName proc
 		mov ah, 09h
 		lea dx, prompt
 		int 21h
-		lea dx, patternFileName
+		lea dx, filename_address
 		int 21h
 		
 
@@ -730,7 +797,7 @@ game proc
 
 
 	
-	mov vel, 2
+	mov vel, 10
 	mov ah, 02Ch
 	int 21h
 	mov ultima_c, dl
@@ -755,37 +822,11 @@ game proc
 
 	mov color,0
 	CLEAR_SCREEN
-	
+
+	notPause:
 	LOAD_IMG_VARS player_w,player_h, img_player
 	CALL_DRAW_IMG player_x,player_y
-	;REEMP CON MACRO
-	cmp px_travel_since_spawn,20
-	jl spawnNotReady
-	sub px_travel_since_spawn,20
-	lea si, pattern
-	
-	;SPAWN_ENT_PREP 20, metx_matrix, mety_matrix, meteor_ammount
-
-	mov cx,18
-	mov meteor_y,10
-	spawnMeteorLoop:
-		push cx
-	
-		ROL word ptr [si],1
-		
-		jnc dontSpawnMet
-	
-		;call spawn_ent
-		CALL_SPAWN_ENTITY meteor_y,metx_matrix,mety_matrix,meteor_ammount
-	
-		dontSpawnMet:
-		add meteor_y,10
-		inc si
-		inc si
-		pop cx
-		loop spawnMeteorLoop
-	spawnNotReady:
-	;FIN MACRO
+	SPAWN_NEWCOL
 	DRAW_METEORS
 	
 
@@ -869,7 +910,7 @@ game proc
         movShipUp:
            ;primero borrar la imagen anterior
 		   mov meteor_y, 50
-			CALL_SPAWN_ENTITY meteor_y,metx_matrix,mety_matrix,meteor_ammount
+			
             CALL_DRAW_RECT player_x, player_y, player_w, player_h, 0
             mov ax, player_y
             sub ax,15
@@ -893,7 +934,7 @@ start:
 	mov color, 10
 	
 	mov ah,00h ; Establece el modo de video
-	mov al,13h ; Selecciona el modo de video
+	mov al,12h ; Selecciona el modo de video
 	int 10h    ; Ejecuta la interrupción de video
 	
 	mov ax, VIDEO_MEM
@@ -901,8 +942,12 @@ start:
 	
 	CALL_LOAD_IMG player_iname, player_w, player_h, img_player
 	CALL_LOAD_IMG meteor_iname, meteor_w, meteor_h, img_meteor
-	;implementar menu
 	
+	
+	IMPRIMIR about
+	IMPRIMIR pressPmsg
+	call pauseP
+	mov filename_address, offset patternFileName
 	call askFileName
 	call read_file
 	call game
