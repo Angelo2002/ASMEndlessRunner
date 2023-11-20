@@ -42,6 +42,17 @@ metx_matrix dw 320 dup(0)
 mety_matrix dw 320 dup(0)
 meteor_ammount dw 0
 
+greenx_matrix dw 320 dup(0)
+greeny_matrix dw 320 dup(0)
+green_ammount dw 0
+
+redx_matrix dw 320 dup(0)
+redy_matrix dw 320 dup(0)
+red_ammount dw 0
+
+bluex_matrix dw 320 dup(0)
+bluey_matrix dw 320 dup(0)
+blue_ammount dw 0
 
 
 ;matrix_pointer dw 0
@@ -166,6 +177,15 @@ DRAW_METEORS MACRO
 	loop drawobs_loop
 	noObstacles:
 ENDM
+
+CALL_DRAW_BUFF MACRO EXMatrix,EYMatrix,ECounter,entColor
+	mov x_mat_address, offset EXMatrix
+	mov y_mat_address, offset EYMatrix
+	mov entity_amm_address,offset ECounter
+	mov color, entColor
+	call draw_buff
+ENDM
+
 
 MOVE_ENTITIES MACRO
 	mov despawn_amm,0
@@ -294,6 +314,34 @@ mov ds, ax
 
 jmp start
 
+draw_buff proc
+
+	mov di,entity_amm_address
+	mov cx,[di]
+	test cx,cx
+	jz noEntities
+	
+	mov di,x_mat_address
+	mov si,y_mat_address
+	
+	drawB_loop:
+	push cx
+	
+	mov dx,[di]
+	mov pos_x, dx
+	mov dx,[si]
+	mov pos_y, dx
+	push si di
+	CALL_DRAW_RECT pos_x, pos_y, meteor_w, meteor_h, color
+	pop di si
+	add si,2
+	add di,2
+
+	pop cx
+	loop drawB_loop
+	noEntities:
+	ret
+draw_buff endp
 
 check_collision proc
 	mov flag,0
@@ -355,7 +403,7 @@ spawn_ent proc
 	shl ax,1
 	mov di, x_mat_address
 	add di,ax
-	mov bx,320
+	mov bx,300
 	sub bx, px_travel_since_spawn ;calcular posicion donde debería aparecer el meteoro
 	mov [di],bx
 	mov di, y_mat_address
@@ -835,6 +883,8 @@ game proc
 	CALL_DRAW_IMG player_x,player_y
 	SPAWN_NEWCOL
 	DRAW_METEORS
+	CALL_DRAW_BUFF greenx_matrix, greeny_matrix, green_ammount, 10
+
 
 
 	MOVE_ENTITIES
@@ -927,6 +977,9 @@ game proc
             mov ax, UP_LIMIT
            
             dibujarShipUp:
+				push ax
+				CALL_SPAWN_ENTITY 40, greenx_matrix, greeny_matrix, green_ammount
+				pop ax
 				mov player_y, ax
                 mov player_x, 0
                 LOAD_IMG_VARS player_w, player_h, img_player
