@@ -36,6 +36,8 @@ no_hit_count db 0
 toptimes dw 4 dup(0)
 number_size db 0
 lives db 0
+rnumber db ?
+seed dw ?
 
 pattern dw 18 dup(1100000000000000b)
 metx_matrix dw 320 dup(0)
@@ -227,9 +229,13 @@ ENDM
 
 SPAWN_NEWCOL MACRO
 	cmp px_travel_since_spawn,20
-	jl spawnNotReady
-	sub px_travel_since_spawn,20
-	cmp px_travel_since_spawn,25
+	jge spawn
+	jmp spawnNotReady
+	spawn:
+	sub px_travel_since_spawn,20 ;
+	;Si los meteoritos empiezan a distanciarse demasiado, la distancia se acumula y causa problemas
+	;Aquí se corrige eso
+	cmp px_travel_since_spawn,25 
 	jle noCorrection
 	mov px_travel_since_spawn,25
 	noCorrection:
@@ -242,13 +248,11 @@ SPAWN_NEWCOL MACRO
 	spawnMeteorLoop:
 		push cx
 	
-		ROL word ptr [si],1
-		
+		ROR word ptr [si],1
+	
 		jnc dontSpawnMet
-	
-		;call spawn_ent
+		
 		CALL_SPAWN_ENTITY meteor_y,metx_matrix,mety_matrix,meteor_ammount
-	
 		dontSpawnMet:
 		add meteor_y,10
 		inc si
@@ -318,6 +322,30 @@ mov ax,@DATA
 mov ds, ax
 
 jmp start
+
+generate_random_number:
+    mov ax, seed   ; Load seed into AX
+
+    ; temp1 = seed xor (seed shr 1)
+    mov bx, ax       ; Copy seed to BX for right shift
+    shr bx, 1        ; BX = seed shr 1
+    xor ax, bx       ; AX = seed xor (seed shr 1), now AX is temp1
+
+    ; temp2 = temp1 xor (temp1 shl 1)
+    mov bx, ax       ; Copy temp1 (now in AX) to BX for left shift
+    shl bx, 1        ; BX = temp1 shl 1
+    xor ax, bx       ; AX = temp1 xor (temp1 shl 1), now AX is temp2
+
+    ; seed = temp2 xor (temp2 shr 2)
+    mov bx, ax       ; Copy temp2 (now in AX) to BX for right shift
+    shr bx, 2        ; BX = temp2 shr 2
+    xor ax, bx       ; AX = temp2 xor (temp2 shr 2)
+    mov seed, ax   ; Update the seed with the new value
+	xor dx,dx
+	mov bx, 4
+	div bx
+	mov rnumber,dl
+ret
 
 draw_buff proc
 
@@ -895,7 +923,7 @@ game proc
 	call NumberToString
 	IMPRIMIR nivmsg
 	IMPRIMIR num_text
-
+	
 
 	
 	;INT 21h / AH=2Ch - get system time;
@@ -906,7 +934,6 @@ game proc
 	
 	;para minimizar el flicker se mantiene la imagen un instante
 	esperar2:
-		
 		mov ah,02Ch
 		int 21h          
 		cmp dl, ultima_c 
@@ -1007,7 +1034,9 @@ ret
 game endp
 
 start:
-
+	mov ah,02Ch
+	int 21h
+	mov seed, dx
 	mov color, 10
 	
 	mov ah,00h ; Establece el modo de video
@@ -1020,6 +1049,15 @@ start:
 	CALL_LOAD_IMG player_iname, player_w, player_h, img_player
 	CALL_LOAD_IMG meteor_iname, meteor_w, meteor_h, img_meteor
 	;implementar menu
+	
+	posicion 20,20
+	call generate_random_number
+	xor ax,ax
+	mov al, rnumber
+	mov number_size,2
+	call NumberToString
+	IMPRIMIR num_text
+	call pauseP
 	IMPRIMIR about
 	IMPRIMIR pressPmsg
 	call pauseP
