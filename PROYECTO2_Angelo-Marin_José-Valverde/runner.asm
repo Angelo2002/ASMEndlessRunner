@@ -195,7 +195,7 @@ MOVE_ENTITIES MACRO
 	jz endOfMeteors
 	moveMet_loop:
 	mov ax,[di]
-	cmp ax,0 ;Ya llego al final
+	cmp ax,0 ;Meteoro ya llego al final
 	je incDespawn
 	sub ax,vel
 	cmp ax,0
@@ -214,6 +214,7 @@ MOVE_ENTITIES MACRO
 	CALL_DESPAWN metx_matrix,mety_matrix,meteor_ammount
 	endOfMeteors:
 ENDM
+
 
 
 SPAWN_ENT_PREP MACRO yPosition,EXMatrix,EYMatrix,ECounter
@@ -726,7 +727,6 @@ read_file PROC
 		
 		jmp next_char
 		notEnough:
-		
 			jmp exit
 		errorRead:
 			IMPRIMIR errLoading
@@ -758,7 +758,7 @@ read_file PROC
         jmp next_char   ; Read next character
 
     next_bit:
-        inc bitCounter           ; Increment bit counter
+        inc bitCounter           
         cmp bitCounter, 16       ; Check if all bits in the word are set
         jl next_charAux
         inc wordCounter           ; Move to the next word
@@ -874,24 +874,21 @@ game proc
 	mov color,0
 	
 	CLEAR_SCREEN
-	CALL_CHECK_COLLISION metx_matrix,mety_matrix,meteor_ammount
-	cmp flag,1
-	jne notPause
-	;codigo de colision
-	notPause:
+
 	LOAD_IMG_VARS player_w,player_h, img_player
 	CALL_DRAW_IMG player_x,player_y
 	SPAWN_NEWCOL
 	DRAW_METEORS
 	CALL_DRAW_BUFF greenx_matrix, greeny_matrix, green_ammount, 10
+	posicion 0, 0 
+	mov ax,gametime
+	mov number_size,4
+	call NumberToString
+	IMPRIMIR segundosmsg
+	IMPRIMIR num_text
 
 
 
-	MOVE_ENTITIES
-	
-	mov ax,vel
-	add px_travel_since_spawn, ax
-	
 	
 	;INT 21h / AH=2Ch - get system time;
 	;return: CH = hour. CL = minute. DH = second. DL = 1/100 seconds.  
@@ -914,15 +911,22 @@ game proc
 	
 	inc gametime
 	inc no_hit_count
+	
 	mov last_sec, dh
 	
 	noChange:
-	posicion 0, 0 
-	mov ax,gametime
-	mov number_size,4
-	call NumberToString
-	IMPRIMIR segundosmsg
-	IMPRIMIR num_text
+	
+	CALL_CHECK_COLLISION metx_matrix,mety_matrix,meteor_ammount
+	cmp flag,1
+	jne noMetCol
+	;codigo de colision
+	noMetCol:
+	
+	
+	MOVE_ENTITIES
+	mov ax,vel
+	add px_travel_since_spawn, ax
+	
 
 	
 	; se lee el bufer del teclado para mover la nave
