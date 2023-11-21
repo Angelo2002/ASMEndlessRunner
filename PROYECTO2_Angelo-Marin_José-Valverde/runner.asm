@@ -19,6 +19,15 @@ byteBuffer db 0
 bitCounter db 0
 wordCounter db 0
 
+mensajeSolicitarMapa db "Cual mapa desea cargar?  (1) (2) (3) (4) (5)", 10, 13, "$"
+menuOpciones1 db "1. Establecer nivel y nombre del jugador", 10, 13, "$"
+menuOpciones2 db "2.        Establecer escenario", 10, 13, "$"
+menuOpciones3 db "3.           Iniciar juego", 10, 13, "$"
+menuOpciones4 db "4.             Acerca de", 10, 13, "$"
+menuOpciones5 db "5.               Salir", 10, 13, "$"
+pausaTexto db "El juego se encuentra en pausa...", 10, 13, "$"
+
+selecionarNivelText db "Ingrese en que nivel (en caso de ser un solo digito pon el 0 primero):" , 10, 13, "$"
 prompt db "Ingrese el nombre del archivo:" , 10, 13, "$"
 pressEntermsg db "Presione ENTER para continuar...$"
 errLoading db "Error al cargar los sprites. Saliendo$"
@@ -973,6 +982,12 @@ game proc
 	mov ah, 01h
 	int 16h
 	jz updateAux
+	
+
+    cmp ah,50h
+    je  movShipDown
+	cmp ah,48h
+    je movShipUp 
 	cmp al, 's'
 	je  movShipDown 
 	cmp al, 'S'
@@ -1050,6 +1065,67 @@ start:
 	CALL_LOAD_IMG meteor_iname, meteor_w, meteor_h, img_meteor
 	;implementar menu
 	
+	posicion 18, 12 ;Coloca el siguiente texto en el centro de la pantalla, fue a puro "ojo"
+    IMPRIMIR menuOpciones1
+	posicion 18, 13
+    IMPRIMIR menuOpciones2
+    posicion 18, 14
+    IMPRIMIR menuOpciones3
+	posicion 18, 15
+    IMPRIMIR menuOpciones4
+	posicion 18, 16
+    IMPRIMIR menuOpciones5
+	
+	menu:
+    mov ah, 01h
+    int 16h
+    jz menu
+
+    mov ah, 00h
+    int 16h
+	
+    cmp al, '1'
+	posicion 0, 18
+	IMPRIMIR selecionarNivelText
+	je CargarNivel
+	cmp al, '2'
+	je cargarTexto
+	
+	cmp al, '3'
+	call game
+	
+    cmp al, '4'
+	IMPRIMIR about
+	IMPRIMIR pressPmsg
+	call pauseP
+	
+    cmp al, '5'
+    je exit
+	jne menu
+	
+	cargarTexto: 
+	mov filename_address, offset patternFileName
+	call askFileName
+	call read_file
+	jmp start
+	
+	CargarNivel:
+    mov ah, 01h
+    int 16h
+    jz CargarNivel
+    mov ah, 00h
+    int 16h
+    sub al, '0'  ;carga el nivel
+    mov ah, al 
+    mov al, 10
+    mul ah
+    mov bl, al 
+    mov ah, 00h
+    int 16h
+    sub al, '0' 
+    add bl, al
+    mov [level], bx
+	jmp start
 	posicion 20,20
 	call generate_random_number
 	xor ax,ax
@@ -1067,11 +1143,9 @@ start:
 	mov level,10
 	call game
 
-	exit:
-	; wait for any key....    
+	exit:  
 	mov ah, 10h
 	int 16h
-	;exit to operating system.
 	mov ax, 4c00h 
-	int 21h 
+	int 21h
 end
