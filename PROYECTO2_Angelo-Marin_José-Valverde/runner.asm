@@ -15,7 +15,7 @@ player_bot_limit dw 0
 
 patternFileName db "patron.txt", 20 dup(0) ;espacio extra
 wordBuffer dw ?
-byteBuffer db 0,'$'
+byteBuffer db 0
 bitCounter db 0
 wordCounter db 0
 
@@ -25,7 +25,7 @@ errLoading db "Error al cargar los sprites. Saliendo$"
 livesmsg db "Vid:$"
 segundosmsg db "Seg:$"
 nivmsg db "Niv:$"
-about db "Proyecto de: Ángelo Marín y José Valverde. Este juego se basa en una nave la cual debe esquivar meteoritos que aparecerán durante toda la partida, la dificultad ira subiendo durante la partida según el tiempo jugado. El objetivo el juego es durar la mayor cantidad de tiempo sin perder las 3 vidas.$"
+about db "Proyecto de: Angelo Marin y Jose Valverde.",10,13,"Este juego se basa en una nave la cual debe esquivar meteoritos que apareceran durante toda la partida, la dificultad ira subiendo durante la partida segun el tiempo jugado.",10,13,"El objetivo el juego es durar la mayor cantidad de tiempo sin perder las 3 vidas",10,13,"$""
 pressPmsg db "Presione P para continuar...$"
 ultima_c db 0
 vel dw 2
@@ -735,19 +735,18 @@ read_file PROC
     bit_is_one:
 		mov wordBuffer,1 
 		mov cl, bitCounter
-		SHL word ptr wordBuffer, cl
+		SHL word ptr wordBuffer, cl ;mueve el bit 1 a donde corresponde
 		mov ax, wordBuffer
-		OR [di],ax
+		OR [di],ax ;lo añade al patrón con un or
         jmp next_bit
 
     bit_is_zero:
 		mov wordBuffer,1 
 		mov cl, bitCounter
-		SHL word ptr wordBuffer, cl
+		SHL word ptr wordBuffer, cl ;mueve el bit 1 a donde corresponde
 		mov ax, wordBuffer
-		NOT ax ;invertir
-		AND [di],ax
-		
+		NOT ax ;invertir, ahora el bit 0 está donde corresponde
+		AND [di],ax ;"quitar" bit del patron (poner en 0)
         jmp next_bit
 
     next_word:
@@ -759,14 +758,14 @@ read_file PROC
 
     next_bit:
         inc bitCounter           
-        cmp bitCounter, 16       ; Check if all bits in the word are set
+        cmp bitCounter, 16       ; Cantidad máxima de bits (word = 16 bits)
         jl next_charAux
-        inc wordCounter           ; Move to the next word
-        mov bitCounter,0      ; Reset bit counter
-        cmp wordCounter, 18       ; Check if all words are filled
+        inc wordCounter           ; Siguiente fila
+        mov bitCounter,0      ; Reset 
+        cmp wordCounter, 18       ; Máximo de filas
         jge closeF
-		next_charAux:
-		jmp next_char
+		next_charAux: 
+		jmp next_char ;los jmp pueden saltar más que uno condicional (jl)
 	closeF:
     call close_file
     ret
@@ -787,7 +786,7 @@ askFileName proc
 	mov ah, 09h
 	lea dx, prompt
 	int 21h
-	mov si, offset patternFileName
+	mov si, filename_address
 	waitForInput:
 		mov ah, 01h
 		int 16h
@@ -807,7 +806,7 @@ askFileName proc
 		jmp askFileNameScreen
 		
 		backspace:
-			cmp si, offset patternFileName
+			cmp si, filename_address
 			je waitForInput
 
 			dec si
@@ -823,7 +822,7 @@ askFileName proc
 		mov ah, 09h
 		lea dx, prompt
 		int 21h
-		lea dx, patternFileName
+		mov dx, filename_address
 		int 21h
 		
 
@@ -1010,7 +1009,7 @@ start:
 	IMPRIMIR about
 	IMPRIMIR pressPmsg
 	call pauseP
-	
+	mov filename_address, offset patternFileName
 	call askFileName
 	call read_file
 	mov level,5
