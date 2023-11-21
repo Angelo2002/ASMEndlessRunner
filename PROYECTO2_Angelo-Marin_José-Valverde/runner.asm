@@ -229,6 +229,10 @@ SPAWN_NEWCOL MACRO
 	cmp px_travel_since_spawn,20
 	jl spawnNotReady
 	sub px_travel_since_spawn,20
+	cmp px_travel_since_spawn,25
+	jle noCorrection
+	mov px_travel_since_spawn,25
+	noCorrection:
 	lea si, pattern
 	
 	;SPAWN_ENT_PREP 20, metx_matrix, mety_matrix, meteor_ammount
@@ -885,7 +889,12 @@ game proc
 	call NumberToString
 	IMPRIMIR segundosmsg
 	IMPRIMIR num_text
-
+	posicion 8, 0 
+	mov ax,level
+	mov number_size,2
+	call NumberToString
+	IMPRIMIR nivmsg
+	IMPRIMIR num_text
 
 
 	
@@ -908,11 +917,16 @@ game proc
 	cmp dh,last_sec
 	je noChange ;seconds, not centiseconds*
 	
+	mov last_sec, dh
 	inc gametime
 	inc no_hit_count
-	
-	mov last_sec, dh
-	
+	cmp no_hit_count,20
+	jl noChange
+	cmp level,15
+	jge noChange
+	inc level
+	add vel,2
+	mov no_hit_count,0
 	noChange:
 	
 	CALL_CHECK_COLLISION metx_matrix,mety_matrix,meteor_ammount
@@ -1012,7 +1026,7 @@ start:
 	mov filename_address, offset patternFileName
 	call askFileName
 	call read_file
-	mov level,5
+	mov level,10
 	call game
 
 	exit:
