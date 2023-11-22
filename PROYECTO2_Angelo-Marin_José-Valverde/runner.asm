@@ -11,6 +11,10 @@ POPALL equ pop dx cx bx ax
 HITBOX_PAD equ 3
 UP_LIMIT equ 10
 BOT_LIMIT equ 190
+
+ARROW_DOWN equ 50h
+ARROW_UP equ 48h
+
 flag db 0
 player_bot_limit dw 0
 
@@ -200,34 +204,14 @@ ENDM
 
 
 MOVE_ENTITIES MACRO
-	mov despawn_amm,0
-	lea di,metx_matrix
-	mov cx,meteor_ammount
-	test cx,cx
-	jz endOfMeteors
-	moveMet_loop:
-	mov ax,[di]
-	cmp ax,0 ;Meteoro ya llego al final
-	je incDespawn
-	sub ax,vel
-	cmp ax,0
-	jge moveMeteor
-	mov ax,0
-	moveMeteor:
-	mov [di],ax
-	jmp dontIncDespawn
-	incDespawn:
-	inc despawn_amm
-	dontIncDespawn:
-	add di,2
-	loop moveMet_loop
+	mov entity_amm_address, offset meteor_ammount
+	mov x_mat_address, offset metx_matrix
+	call move_entity_type
 	cmp despawn_amm,0
 	je endOfMeteors
-	CALL_DESPAWN metx_matrix,mety_matrix,meteor_ammount
+	call despawnEntities
 	endOfMeteors:
 ENDM
-
-
 
 SPAWN_ENT_PREP MACRO yPosition,EXMatrix,EYMatrix,ECounter
 	mov entity_amm_address, offset ECounter
@@ -333,7 +317,9 @@ mov ds, ax
 
 jmp start
 
-generate_random_number:
+
+
+generate_random_number proc
     mov ax, seed   ; Load seed into AX
 
     ; temp1 = seed xor (seed shr 1)
@@ -356,7 +342,7 @@ generate_random_number:
 	div bx
 	mov rnumber,dl
 ret
-
+endp generate_random_number
 draw_buff proc
 
 	mov di,entity_amm_address
@@ -386,6 +372,35 @@ draw_buff proc
 	ret
 draw_buff endp
 
+
+move_entity_type proc
+	mov despawn_amm,0
+	mov di,entity_amm_address
+	mov cx,[di]
+	mov di,x_mat_address
+	test cx,cx
+	jz noEntToMove
+	moveEnt_loop:
+	mov ax,[di]
+	cmp ax,0 ;Meteoro ya llego al final
+	je incDespawn
+	sub ax,vel
+	cmp ax,0
+	jge moveEnt
+	mov ax,0
+	moveEnt:
+	mov [di],ax
+	jmp dontIncDespawn
+	incDespawn:
+	inc despawn_amm
+	dontIncDespawn:
+	add di,2
+	loop moveEnt_loop
+	noEntToMove:
+	ret
+endp
+
+
 check_collision proc
 	mov flag,0
 	mov si, x_mat_address
@@ -414,6 +429,7 @@ check_collision endp
 
 check_single_collision proc
 	 ;obstaculo = ax
+	 ;Area del jugador: BX(arriba) a DX(abajo)
 	 mov di, y_address
 	 mov ax,[di]
 	 mov bx, player_y
@@ -919,6 +935,9 @@ game proc
 
 	mov color,0
 	
+	;SE UTILIZAN MACROS CUANDO SEA POSIBLE PARA EVITAR LLAMADAS INNECESARIAS A PROCEDIMIENTOS
+	;QUE PODRÍAN RALENTIZAR AÚN MÁS EL CICLO DE ACTUALIZACIÓN
+	;Y PARA MANTENER UN CÓDIGO LEGIBLE
 	CLEAR_SCREEN
 
 	LOAD_IMG_VARS player_w,player_h, img_player
@@ -988,11 +1007,10 @@ game proc
 	mov ah, 01h
 	int 16h
 	jz updateAux
-	
 
-    cmp ah,50h
+    cmp ah,ARROW_DOWN
     je  movShipDown
-	cmp ah,48h
+	cmp ah,ARROW_UP
     je movShipUp 
 	cmp al, 's'
 	je  movShipDown 
