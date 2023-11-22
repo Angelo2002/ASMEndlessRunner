@@ -117,7 +117,8 @@ img_meteor db 262 dup(?)
 
 meteor_w dw ?
 meteor_h dw ?
-
+buff_w dw ?
+buff_h dw ?
 
 
 img_address dw ?
@@ -211,6 +212,35 @@ MOVE_ENTITIES MACRO
 	je endOfMeteors
 	call despawnEntities
 	endOfMeteors:
+	
+	    ; Move Green Entities
+    mov entity_amm_address, offset green_ammount
+    mov x_mat_address, offset greenx_matrix
+    call move_entity_type
+    cmp despawn_amm, 0
+    je endOfGreen
+    call despawnEntities
+    endOfGreen:
+
+    ; Move Red Entities
+    mov entity_amm_address, offset red_ammount
+    mov x_mat_address, offset redx_matrix
+    call move_entity_type
+    cmp despawn_amm, 0
+    je endOfRed
+    call despawnEntities
+    endOfRed:
+
+    ; Move Blue Entities
+    mov entity_amm_address, offset blue_ammount
+    mov x_mat_address, offset bluex_matrix
+
+    call move_entity_type
+    cmp despawn_amm, 0
+    je endOfBlue
+    call despawnEntities
+    endOfBlue:
+	
 ENDM
 
 SPAWN_ENT_PREP MACRO yPosition,EXMatrix,EYMatrix,ECounter
@@ -359,9 +389,10 @@ draw_buff proc
 	mov dx,[di]
 	mov pos_x, dx
 	mov dx,[si]
+	add dx, HITBOX_PAD ;para representar correctamente la imagen con resp. a la colisión
 	mov pos_y, dx
 	push si di
-	CALL_DRAW_RECT pos_x, pos_y, meteor_w, meteor_h, color
+	CALL_DRAW_RECT pos_x, pos_y, buff_w, buff_h, color
 	pop di si
 	add si,2
 	add di,2
@@ -905,6 +936,15 @@ game proc
 	mov ax, BOT_LIMIT
 	sub ax, player_h
 	mov player_bot_limit,ax
+	
+	mov ax,meteor_h
+	sub ax, HITBOX_PAD
+	sub ax, HITBOX_PAD
+	mov buff_h,ax
+	mov ax, meteor_w
+	shr ax,1
+	mov buff_w,ax
+	
 	mov meteor_ammount,0
 	mov px_travel_since_spawn,20
 	mov lives, 3
