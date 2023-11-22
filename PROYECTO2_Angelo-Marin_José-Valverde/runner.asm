@@ -15,7 +15,7 @@ BOT_LIMIT equ 190
 ARROW_DOWN equ 50h
 ARROW_UP equ 48h
 
-COOLDOWN_TIME equ 10
+COOLDOWN_TIME equ 20
 
 flag db 0
 player_bot_limit dw 0
