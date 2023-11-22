@@ -15,6 +15,8 @@ BOT_LIMIT equ 190
 ARROW_DOWN equ 50h
 ARROW_UP equ 48h
 
+COOLDOWN_TIME equ 10
+
 flag db 0
 player_bot_limit dw 0
 
@@ -41,12 +43,14 @@ segundosmsg db "Seg:$"
 nivmsg db "Niv:$"
 about db "Proyecto de: Angelo Marin y Jose Valverde.",10,13,"Este juego se basa en una nave la cual debe esquivar meteoritos que apareceran durante toda la partida, la dificultad ira subiendo durante la partida segun el tiempo jugado.",10,13,"El objetivo el juego es durar la mayor cantidad de tiempo sin perder las 3 vidas",10,13,"$""
 pressPmsg db "Presione P para continuar...$"
+
 ultima_c db 0
 vel dw 2
 level dw 1
 last_sec db 0
 gametime dw 0
 no_hit_count db 0
+buff_cooldown db 0
 toptimes dw 4 dup(0)
 number_size db 0
 lives db 0
@@ -213,7 +217,7 @@ MOVE_ENTITIES MACRO
 	call despawnEntities
 	endOfMeteors:
 	
-	    ; Move Green Entities
+
     mov entity_amm_address, offset green_ammount
     mov x_mat_address, offset greenx_matrix
     call move_entity_type
@@ -222,7 +226,7 @@ MOVE_ENTITIES MACRO
     call despawnEntities
     endOfGreen:
 
-    ; Move Red Entities
+
     mov entity_amm_address, offset red_ammount
     mov x_mat_address, offset redx_matrix
     call move_entity_type
@@ -231,7 +235,7 @@ MOVE_ENTITIES MACRO
     call despawnEntities
     endOfRed:
 
-    ; Move Blue Entities
+ 
     mov entity_amm_address, offset blue_ammount
     mov x_mat_address, offset bluex_matrix
 
@@ -254,7 +258,7 @@ ENDM
 SPAWN_NEWCOL MACRO
 	cmp px_travel_since_spawn,20
 	jge spawn
-	jmp spawnNotReady
+	jmp endSpawn
 	spawn:
 	sub px_travel_since_spawn,20 ;
 	;Si los meteoritos empiezan a distanciarse demasiado, la distancia se acumula y causa problemas
@@ -267,9 +271,17 @@ SPAWN_NEWCOL MACRO
 	
 	;SPAWN_ENT_PREP 20, metx_matrix, mety_matrix, meteor_ammount
 
+	cmp buff_cooldown,0
+	je minCooldown
+	dec buff_cooldown
+	minCooldown:
 	mov cx,18
 	mov meteor_y,10
 	spawnMeteorLoop:
+		test cx,cx
+		jnz doSpawn
+		jmp endSpawn
+		doSpawn:
 		push cx
 	
 		ROR word ptr [si],1
@@ -277,13 +289,50 @@ SPAWN_NEWCOL MACRO
 		jnc dontSpawnMet
 		
 		CALL_SPAWN_ENTITY meteor_y,metx_matrix,mety_matrix,meteor_ammount
+		jmp continueSpawn
 		dontSpawnMet:
+			cmp buff_cooldown,0
+			jne continueSpawn
+			
+			call generate_random_number
+			
+			
+			
+			
+			cmp rnumber,0
+			je spawnGreen
+			
+			cmp rnumber,1
+			je spawnRed
+			
+			cmp rnumber,2
+			je spawnBlue
+			jne continueSpawn
+			
+			spawnGreen:
+			CALL_SPAWN_ENTITY meteor_y, greenx_matrix, greeny_matrix, green_ammount
+			jmp resetBuff
+
+			spawnRed:
+			CALL_SPAWN_ENTITY meteor_y, redx_matrix, redy_matrix, red_ammount
+			jmp resetBuff
+		
+			spawnBlue:
+			CALL_SPAWN_ENTITY meteor_y, bluex_matrix, bluey_matrix, blue_ammount
+			
+			;jmp continueSpawn
+		
+		resetBuff:
+		mov buff_cooldown,COOLDOWN_TIME
+	
+		continueSpawn:
 		add meteor_y,10
 		inc si
 		inc si
 		pop cx
-		loop spawnMeteorLoop
-	spawnNotReady:
+		dec cx
+		jmp spawnMeteorLoop
+	endSpawn:
 ENDM
 
 ;Loads the address of img information into address variables
@@ -368,7 +417,7 @@ generate_random_number proc
     xor ax, bx       ; AX = temp2 xor (temp2 shr 2)
     mov seed, ax   ; Update the seed with the new value
 	xor dx,dx
-	mov bx, 4
+	mov bx, 9
 	div bx
 	mov rnumber,dl
 ret
@@ -985,6 +1034,9 @@ game proc
 	SPAWN_NEWCOL
 	DRAW_METEORS
 	CALL_DRAW_BUFF greenx_matrix, greeny_matrix, green_ammount, 10
+	CALL_DRAW_BUFF redx_matrix, redy_matrix, red_ammount, 12
+	CALL_DRAW_BUFF bluex_matrix, bluey_matrix, blue_ammount, 9
+	
 	posicion 0, 0 
 	mov ax,gametime
 	mov number_size,4
@@ -1101,7 +1153,6 @@ game proc
            
             dibujarShipUp:
 				push ax
-				CALL_SPAWN_ENTITY 40, greenx_matrix, greeny_matrix, green_ammount
 				pop ax
 				mov player_y, ax
                 mov player_x, 0
