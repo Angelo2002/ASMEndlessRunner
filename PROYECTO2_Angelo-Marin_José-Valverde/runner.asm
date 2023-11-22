@@ -8,6 +8,7 @@ VIDEO_MEM equ 0A000h
 PUSHALL equ push ax bx cx dx
 POPALL equ pop dx cx bx ax
 
+HITBOX_PAD equ 3
 UP_LIMIT equ 10
 BOT_LIMIT equ 190
 flag db 0
@@ -38,7 +39,7 @@ about db "Proyecto de: Angelo Marin y Jose Valverde.",10,13,"Este juego se basa 
 pressPmsg db "Presione P para continuar...$"
 ultima_c db 0
 vel dw 2
-level dw 0
+level dw 1
 last_sec db 0
 gametime dw 0
 no_hit_count db 0
@@ -48,7 +49,7 @@ lives db 0
 rnumber db ?
 seed dw ?
 
-pattern dw 18 dup(1100000000000000b)
+pattern dw 3 dup(1100000000000001b), 3 dup(0000111111111100b),3 dup(0), 9 dup(0FFFFh)
 metx_matrix dw 320 dup(0)
 mety_matrix dw 320 dup(0)
 meteor_ammount dw 0
@@ -418,6 +419,11 @@ check_single_collision proc
 	 mov bx, player_y
 	 mov dx, bx
 	 add dx, player_h
+	 
+	 ;el hitbox del personaje es más pequeño de lo que aparenta la imagen
+	 add bx, HITBOX_PAD 
+	 sub dx, HITBOX_PAD
+	 
 	 cmp ax,bx
 	 jl secondway
      cmp ax,dx
@@ -1011,7 +1017,7 @@ game proc
            ;primero borrar la imagen anterior
             CALL_DRAW_RECT player_x, player_y, player_w, player_h, 0
             mov ax, player_y
-            add ax, 15
+            add ax, 7
             cmp ax, player_bot_limit
             jle dibujarShipDown
             
@@ -1029,7 +1035,7 @@ game proc
 			
             CALL_DRAW_RECT player_x, player_y, player_w, player_h, 0
             mov ax, player_y
-            sub ax,15
+            sub ax,7
             cmp ax, UP_LIMIT
             jge dibujarShipUp        
             
@@ -1048,6 +1054,26 @@ game proc
 ret
 game endp
 
+testing PROC
+	;BORRAR ESTO ANTES DE ENTREGA
+	call generate_random_number
+	xor ax,ax
+	mov al, rnumber
+	mov number_size,2
+	call NumberToString
+	IMPRIMIR num_text
+	call pauseP
+	IMPRIMIR about
+	IMPRIMIR pressPmsg
+	call pauseP
+	mov filename_address, offset patternFileName
+	call askFileName
+	call read_file
+	mov level,10
+	call game
+	ret
+testing endp
+
 start:
 	mov ah,02Ch
 	int 21h
@@ -1063,10 +1089,12 @@ start:
 	
 	CALL_LOAD_IMG player_iname, player_w, player_h, img_player
 	CALL_LOAD_IMG meteor_iname, meteor_w, meteor_h, img_meteor
-	;implementar menu
-	
-	posicion 18, 12 ;Coloca el siguiente texto en el centro de la pantalla, fue a puro "ojo"
-    IMPRIMIR menuOpciones1
+menu:
+	mov ah,00h
+	mov al,12h
+	int 10h   
+	posicion 18, 12
+	IMPRIMIR menuOpciones1
 	posicion 18, 13
     IMPRIMIR menuOpciones2
     posicion 18, 14
@@ -1076,40 +1104,44 @@ start:
 	posicion 18, 16
     IMPRIMIR menuOpciones5
 	
-	menu:
+	waitForOption:
     mov ah, 01h
     int 16h
-    jz menu
+    jz waitForOption
 
     mov ah, 00h
     int 16h
 	
     cmp al, '1'
-	posicion 0, 18
-	IMPRIMIR selecionarNivelText
 	je CargarNivel
+	
 	cmp al, '2'
 	je cargarTexto
 	
 	cmp al, '3'
-	call game
+	je startGame
+	
 	
     cmp al, '4'
-	IMPRIMIR about
-	IMPRIMIR pressPmsg
-	call pauseP
+	je showAbout
 	
     cmp al, '5'
     je exit
-	jne menu
+	jne waitForOption
 	
 	cargarTexto: 
 	mov filename_address, offset patternFileName
 	call askFileName
 	call read_file
-	jmp start
+	jmp menu
+	
+	startGame:
+	call game
+	jmp menu
 	
 	CargarNivel:
+	posicion 0, 18
+	IMPRIMIR selecionarNivelText
     mov ah, 01h
     int 16h
     jz CargarNivel
@@ -1126,26 +1158,20 @@ start:
     add bl, al
     mov [level], bx
 	jmp start
-	posicion 20,20
-	call generate_random_number
-	xor ax,ax
-	mov al, rnumber
-	mov number_size,2
-	call NumberToString
-	IMPRIMIR num_text
-	call pauseP
+	
+	showAbout:
+	posicion 0,3
 	IMPRIMIR about
-	IMPRIMIR pressPmsg
-	call pauseP
-	mov filename_address, offset patternFileName
-	call askFileName
-	call read_file
-	mov level,10
-	call game
+	jmp menu
+
+
 
 	exit:  
-	mov ah, 10h
-	int 16h
-	mov ax, 4c00h 
-	int 21h
+		mov ah,00h
+		mov al,0h
+		int 10h
+		mov ah, 10h
+		int 16h
+		mov ax, 4c00h 
+		int 21h
 end
