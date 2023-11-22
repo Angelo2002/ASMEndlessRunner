@@ -15,7 +15,7 @@ BOT_LIMIT equ 190
 ARROW_DOWN equ 50h
 ARROW_UP equ 48h
 
-COOLDOWN_TIME equ 20
+COOLDOWN_TIME equ 15
 
 flag db 0
 player_bot_limit dw 0
@@ -214,6 +214,7 @@ MOVE_ENTITIES MACRO
 	call move_entity_type
 	cmp despawn_amm,0
 	je endOfMeteors
+	mov y_mat_address, offset mety_matrix
 	call despawnEntities
 	endOfMeteors:
 	
@@ -223,6 +224,7 @@ MOVE_ENTITIES MACRO
     call move_entity_type
     cmp despawn_amm, 0
     je endOfGreen
+	mov y_mat_address, offset greeny_matrix
     call despawnEntities
     endOfGreen:
 
@@ -232,6 +234,7 @@ MOVE_ENTITIES MACRO
     call move_entity_type
     cmp despawn_amm, 0
     je endOfRed
+	mov y_mat_address, offset redy_matrix
     call despawnEntities
     endOfRed:
 
@@ -242,6 +245,7 @@ MOVE_ENTITIES MACRO
     call move_entity_type
     cmp despawn_amm, 0
     je endOfBlue
+	mov y_mat_address, offset bluey_matrix
     call despawnEntities
     endOfBlue:
 	
@@ -1088,6 +1092,23 @@ game proc
 	;codigo de colision
 	noMetCol:
 	
+	CALL_CHECK_COLLISION greenx_matrix,greeny_matrix,green_ammount
+	cmp flag,1
+	jne noGreenCol
+	;codigo de colision
+	noGreenCol:
+	
+	CALL_CHECK_COLLISION redx_matrix,redy_matrix,red_ammount
+	cmp flag,1
+	jne noRedCol
+	;codigo de colision
+	noRedCol:
+	
+	CALL_CHECK_COLLISION bluex_matrix,bluey_matrix,blue_ammount
+	cmp flag,1
+	jne noBlueCol
+	;codigo de colision
+	noBlueCol:
 	
 	MOVE_ENTITIES
 	mov ax,vel
