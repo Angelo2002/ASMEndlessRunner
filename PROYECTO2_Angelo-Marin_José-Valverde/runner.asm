@@ -17,6 +17,9 @@ ARROW_UP equ 48h
 
 COOLDOWN_TIME equ 15
 
+IFRAME_TIME equ 20
+iframe db 0
+
 flag db 0
 player_bot_limit dw 0
 
@@ -25,6 +28,8 @@ wordBuffer dw ?
 byteBuffer db 0
 bitCounter db 0
 wordCounter db 0
+
+SPACEVAR db " $"
 
 mensajeSolicitarMapa db "Cual mapa desea cargar?  (1) (2) (3) (4) (5)", 10, 13, "$"
 menuOpciones1 db "1. Establecer nivel y nombre del jugador", 10, 13, "$"
@@ -41,7 +46,7 @@ errLoading db "Error al cargar los sprites. Saliendo$"
 livesmsg db "Vid:$"
 segundosmsg db "Seg:$"
 nivmsg db "Niv:$"
-about db "Proyecto de: Angelo Marin y Jose Valverde.",10,13,"Este juego se basa en una nave la cual debe esquivar meteoritos que apareceran durante toda la partida, la dificultad ira subiendo durante la partida segun el tiempo jugado.",10,13,"El objetivo el juego es durar la mayor cantidad de tiempo sin perder las 3 vidas",10,13,"$""
+about db "Proyecto de: Angelo Marin y Jose Valverde.",10,13,"Este juego se basa en una nave la cual debe esquivar meteoritos que apareceran",10,13,"durante toda la partida, la dificultad ira subiendo durante la partida segun el tiempo jugado.",10,13,"El objetivo el juego es durar la mayor cantidad de tiempo sin perder las 3 vidas",10,13,"$""
 pressPmsg db "Presione P para continuar...$"
 
 ultima_c db 0
@@ -86,6 +91,7 @@ despawn_amm dw 0
 screen_w dw 320 
 screen_h dw 200  
 num_text db 5 dup('0'),10,13, '$'
+
 handle dw ?
 
 
@@ -104,7 +110,7 @@ color db 0
 meteor_x dw 20
 meteor_y dw 20
 ;Player
-
+player_name db "JUGADOR", 5 dup('$')
 player_x dw 0
 player_y dw 20
 ;Images
@@ -486,6 +492,7 @@ endp
 
 
 check_collision proc
+
 	mov flag,0
 	mov si, x_mat_address
 	mov di, entity_amm_address
@@ -495,18 +502,20 @@ check_collision proc
 	checkColLoop:
 	cmp cx,bx
 	jge finishedCol
+
 	mov ax,player_w
 	cmp ax,[si]
 	jl finishedCol
 	mov y_address, di
 	call check_single_collision
 	cmp flag,1
-	je finishedCol
+	je colHappened
 	inc si
 	inc si
 	inc di
 	inc di
 	jmp checkColLoop
+	colHappened:
 	finishedCol:
 	ret
 check_collision endp
@@ -1042,18 +1051,32 @@ game proc
 	CALL_DRAW_BUFF bluex_matrix, bluey_matrix, blue_ammount, 9
 	
 	posicion 0, 0 
+	
+	IMPRIMIR livesmsg
+	xor ax,ax
+	mov al,lives
+	mov number_size,1
+	call NumberToString
+	IMPRIMIR num_text
+	
+	posicion 6,0
+	
 	mov ax,gametime
 	mov number_size,4
 	call NumberToString
 	IMPRIMIR segundosmsg
 	IMPRIMIR num_text
-	posicion 8, 0 
+	
+	posicion 15,0
 	mov ax,level
 	mov number_size,2
 	call NumberToString
 	IMPRIMIR nivmsg
 	IMPRIMIR num_text
 	
+	posicion 25,0
+	
+	IMPRIMIR player_name
 
 	
 	;INT 21h / AH=2Ch - get system time;
@@ -1085,12 +1108,22 @@ game proc
 	add vel,2
 	mov no_hit_count,0
 	noChange:
-	
+	cmp iframe,0
+	jg decIframe
 	CALL_CHECK_COLLISION metx_matrix,mety_matrix,meteor_ammount
 	cmp flag,1
 	jne noMetCol
-	;codigo de colision
+	dec lives
+	mov iframe,IFRAME_TIME
+	cmp lives,0
+	
+	jg noMetCol
+	call pauseP
+	decIframe:
+	dec iframe
 	noMetCol:
+	
+
 	
 	CALL_CHECK_COLLISION greenx_matrix,greeny_matrix,green_ammount
 	cmp flag,1
@@ -1292,7 +1325,7 @@ menu:
 	showAbout:
 	posicion 0,3
 	IMPRIMIR about
-	jmp menu
+	jmp waitForOption
 
 
 
