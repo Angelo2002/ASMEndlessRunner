@@ -492,7 +492,7 @@ endp
 
 
 check_collision proc
-
+	mov despawn_amm,0
 	mov flag,0
 	mov si, x_mat_address
 	mov di, entity_amm_address
@@ -506,17 +506,27 @@ check_collision proc
 	mov ax,player_w
 	cmp ax,[si]
 	jl finishedCol
+	
+	;CX debe terminar de revisar cuantos de los obstaculos en el rango X del jugador 
+	;Para poder eliminar a toda la columna en caso de colisión.
+	cmp flag,1
+	je incCX 
+	
 	mov y_address, di
 	call check_single_collision
-	cmp flag,1
-	je colHappened
 	inc si
 	inc si
 	inc di
 	inc di
+	incCX:
+	inc cx
 	jmp checkColLoop
-	colHappened:
 	finishedCol:
+	cmp flag,1
+	jne dontDespawn
+	mov despawn_amm,cx
+	call despawnEntities
+	dontDespawn:
 	ret
 check_collision endp
 
