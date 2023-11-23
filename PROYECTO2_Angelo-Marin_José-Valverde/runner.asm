@@ -42,7 +42,10 @@ menuOpciones5 db "5.               Salir", 10, 13, "$"
 pausaTexto db "El juego se encuentra en pausa...", 10, 13, "$"
 
 selecionarNivelText db "Utilice FLECHA ARRIBA y FLECHA ABAJO para cambiar la dificultad:" , 10, 13, "$"
+endgame db "GAME OVER", 10, 13, "$"
+endgameInfo db "Presione p para salir", 10, 13, "$"
 prompt db "Ingrese el nombre del archivo:" , 10, 13, "$"
+promptName db "Ingrese su nombre:" , 10, 13, "$"
 pressEntermsg db "Presione ENTER para continuar...$"
 errLoading db "Error al cargar los sprites. Saliendo$"
 livesmsg db "Vid:$"
@@ -947,7 +950,60 @@ read_file PROC
 	
 read_file ENDP
 
+askName proc
+	;mostrar en pantalla
+	mov ah,00h 
+	mov al,12h 
+	int 10h 
+	posicion 1, 1 
+	mov ah, 09h
+	lea dx, promptName
+	int 21h
+	mov si, filename_address
+	waitForInputName:
+		mov ah, 01h
+		int 16h
+		jz waitForInputName
+		mov ah, 00h
+		int 16h
+		
+		cmp al, 0Dh ; ENTER key
+		je inputRetrievedName
+		
+		cmp al, 08h
+		je backspaceName
+		
+        mov byte ptr [si], al ;añade caracter
+		mov byte ptr [si+1],'$'
+        inc si 
+		jmp askNameScreen
+		
+		backspaceName:
+			cmp si, filename_address
+			je waitForInputName
 
+			dec si
+			mov byte ptr [si],'$'
+		
+		askNameScreen:
+		
+		;mostrar en pantalla
+		mov ah,00h 
+		mov al,12h 
+		int 10h 
+		posicion 1, 1 
+		mov ah, 09h
+		lea dx, promptName
+		int 21h
+		mov dx, filename_address
+		int 21h
+		
+
+        jmp waitForInputName
+
+	inputRetrievedName:
+    ret
+askName endp
 
 askFileName proc
 	
@@ -1136,7 +1192,9 @@ game proc
 	cmp lives,0
 	jg noMetCol
 	;GAMEOVER
-	call pauseP
+	call gameOver
+	call pauseP;-----------------------------------------------------------------------------------------------------------------------------------------------------------
+	jmp menu
 	decIframe:
 	dec iframe
 	noMetCol:
@@ -1247,25 +1305,16 @@ game proc
 ret
 game endp
 
-testing PROC
-	;BORRAR ESTO ANTES DE ENTREGA
-	call generate_random_number
-	xor ax,ax
-	mov al, rnumber
-	mov number_size,2
-	call NumberToString
-	IMPRIMIR num_text
-	call pauseP
-	IMPRIMIR about
-	IMPRIMIR pressPmsg
-	call pauseP
-	mov filename_address, offset patternFileName
-	call askFileName
-	call read_file
-	mov level,10
-	call game
+gameOver proc 
+	mov ah,00h
+	mov al,12h
+	int 10h   
+	posicion 30, 15
+	IMPRIMIR endgame
+	posicion 30, 16
+	IMPRIMIR endgameInfo
 	ret
-testing endp
+gameOver endp
 
 askDificulty proc
 	printDif:
@@ -1321,7 +1370,7 @@ start:
 	CALL_LOAD_IMG meteor_iname, meteor_w, meteor_h, img_meteor
 	
 	mov filename_address, offset player_name
-	call askFileName
+	call askName
 	
 menu:
 	mov ah,00h
