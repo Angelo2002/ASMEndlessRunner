@@ -1132,8 +1132,8 @@ game proc
 	dec lives
 	mov iframe,IFRAME_TIME
 	cmp lives,0
-	
 	jg noMetCol
+	;GAMEOVER
 	call pauseP
 	decIframe:
 	dec iframe
@@ -1144,11 +1144,12 @@ game proc
 	CALL_CHECK_COLLISION greenx_matrix,greeny_matrix,green_ammount
 	cmp flag,1
 	jne noGreenCol
-
+	;codigo de colision
 	noGreenCol:
 	
 	CALL_CHECK_COLLISION redx_matrix,redy_matrix,red_ammount
 	cmp flag,1
+	;codigo de colision
 	jne noRedCol
 	
 	noRedCol:
