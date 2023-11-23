@@ -17,7 +17,9 @@ ARROW_UP equ 48h
 
 COOLDOWN_TIME equ 15
 
-IFRAME_TIME equ 20
+
+
+IFRAME_TIME equ 10
 iframe db 0
 
 flag db 0
@@ -495,8 +497,8 @@ check_collision proc
 	mov despawn_amm,0
 	mov flag,0
 	mov si, x_mat_address
-	mov di, entity_amm_address
 	mov cx, 0
+	mov di, entity_amm_address
 	mov bx,[di]
 	mov di, y_mat_address
 	checkColLoop:
@@ -510,15 +512,17 @@ check_collision proc
 	;CX debe terminar de revisar cuantos de los obstaculos en el rango X del jugador 
 	;Para poder eliminar a toda la columna en caso de colisión.
 	cmp flag,1
-	je incCX 
+	je incCounters 
 	
 	mov y_address, di
+	
 	call check_single_collision
+	
+	incCounters:
 	inc si
 	inc si
 	inc di
 	inc di
-	incCX:
 	inc cx
 	jmp checkColLoop
 	finishedCol:
@@ -533,6 +537,7 @@ check_collision endp
 check_single_collision proc
 	 ;obstaculo = ax
 	 ;Area del jugador: BX(arriba) a DX(abajo)
+	 push di ax bx dx
 	 mov di, y_address
 	 mov ax,[di]
 	 mov bx, player_y
@@ -558,6 +563,7 @@ check_single_collision proc
 	 mov flag, 1
 	 
 	 no_colition:
+	 pop dx bx ax di
 	 ret
 check_single_collision endp
 
@@ -1112,7 +1118,7 @@ game proc
 	inc no_hit_count
 	cmp no_hit_count,20
 	jl noChange
-	cmp level,15
+	cmp level,20
 	jge noChange
 	inc level
 	add vel,2
@@ -1138,15 +1144,14 @@ game proc
 	CALL_CHECK_COLLISION greenx_matrix,greeny_matrix,green_ammount
 	cmp flag,1
 	jne noGreenCol
-	;codigo de colision
+
 	noGreenCol:
 	
 	CALL_CHECK_COLLISION redx_matrix,redy_matrix,red_ammount
 	cmp flag,1
 	jne noRedCol
-	;codigo de colision
-	noRedCol:
 	
+	noRedCol:
 	CALL_CHECK_COLLISION bluex_matrix,bluey_matrix,blue_ammount
 	cmp flag,1
 	jne noBlueCol
