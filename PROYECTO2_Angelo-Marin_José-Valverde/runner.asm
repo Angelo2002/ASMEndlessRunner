@@ -1319,6 +1319,10 @@ start:
 	
 	CALL_LOAD_IMG player_iname, player_w, player_h, img_player
 	CALL_LOAD_IMG meteor_iname, meteor_w, meteor_h, img_meteor
+	
+	mov filename_address, offset player_name
+	call askFileName
+	
 menu:
 	mov ah,00h
 	mov al,12h
