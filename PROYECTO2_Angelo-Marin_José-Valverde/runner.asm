@@ -34,14 +34,14 @@ wordCounter db 0
 SPACEVAR db " $"
 
 mensajeSolicitarMapa db "Cual mapa desea cargar?  (1) (2) (3) (4) (5)", 10, 13, "$"
-menuOpciones1 db "1. Establecer nivel y nombre del jugador", 10, 13, "$"
+menuOpciones1 db "1. Establecer nivel de dificultad", 10, 13, "$"
 menuOpciones2 db "2.        Establecer escenario", 10, 13, "$"
 menuOpciones3 db "3.           Iniciar juego", 10, 13, "$"
 menuOpciones4 db "4.             Acerca de", 10, 13, "$"
 menuOpciones5 db "5.               Salir", 10, 13, "$"
 pausaTexto db "El juego se encuentra en pausa...", 10, 13, "$"
 
-selecionarNivelText db "Ingrese en que nivel (en caso de ser un solo digito pon el 0 primero):" , 10, 13, "$"
+selecionarNivelText db "Utilice FLECHA ARRIBA y FLECHA ABAJO para cambiar la dificultad:" , 10, 13, "$"
 prompt db "Ingrese el nombre del archivo:" , 10, 13, "$"
 pressEntermsg db "Presione ENTER para continuar...$"
 errLoading db "Error al cargar los sprites. Saliendo$"
@@ -52,7 +52,7 @@ about db "Proyecto de: Angelo Marin y Jose Valverde.",10,13,"Este juego se basa 
 pressPmsg db "Presione P para continuar...$"
 
 ultima_c db 0
-vel dw 2
+
 level dw 1
 last_sec db 0
 gametime dw 0
@@ -410,6 +410,7 @@ jmp start
 
 
 
+
 generate_random_number proc
     mov ax, seed   ; Load seed into AX
 
@@ -476,7 +477,7 @@ move_entity_type proc
 	mov ax,[di]
 	cmp ax,0 ;Meteoro ya llego al final
 	je incDespawn
-	sub ax,vel
+	sub ax,level
 	cmp ax,0
 	jge moveEnt
 	mov ax,0
@@ -1026,9 +1027,9 @@ game proc
 	mov meteor_ammount,0
 	mov px_travel_since_spawn,20
 	mov lives, 3
-	mov ax, level
-	shl ax,1
-	mov vel,ax
+	
+	
+	
 	mov ah, 02Ch
 	int 21h
 	mov ultima_c, dl
@@ -1120,9 +1121,10 @@ game proc
 	jl noChange
 	cmp level,20
 	jge noChange
+	
 	inc level
-	add vel,2
 	mov no_hit_count,0
+	
 	noChange:
 	cmp iframe,0
 	jg decIframe
@@ -1144,23 +1146,35 @@ game proc
 	CALL_CHECK_COLLISION greenx_matrix,greeny_matrix,green_ammount
 	cmp flag,1
 	jne noGreenCol
-	;codigo de colision
+	
+	cmp level,1
+	jle noGreenCol
+	
+	dec level
+	
 	noGreenCol:
 	
 	CALL_CHECK_COLLISION redx_matrix,redy_matrix,red_ammount
-	cmp flag,1
-	;codigo de colision
+	cmp flag,1	
 	jne noRedCol
 	
+	add level,2
+	cmp level,20
+	jle noRedCol
+	mov level,20
+
 	noRedCol:
 	CALL_CHECK_COLLISION bluex_matrix,bluey_matrix,blue_ammount
 	cmp flag,1
 	jne noBlueCol
-	;codigo de colision
+	
+	cmp lives,3
+	je noBlueCol
+	inc lives
 	noBlueCol:
 	
 	MOVE_ENTITIES
-	mov ax,vel
+	mov ax,level
 	add px_travel_since_spawn, ax
 	
 
@@ -1253,6 +1267,43 @@ testing PROC
 	ret
 testing endp
 
+askDificulty proc
+	printDif:
+	posicion 0, 18
+	IMPRIMIR selecionarNivelText
+	mov ax,level
+	call NumberToString
+	IMPRIMIR num_text
+	
+	waitForArrowKey:
+	mov ah, 01h
+	int 16h
+    jz waitForArrowKey
+
+    mov ah, 00h
+    int 16h
+	
+	cmp ah, ARROW_UP
+	jne dontIncrement
+	cmp level,20
+	je dontIncrement
+	inc level
+	
+	dontIncrement:
+	
+	cmp ah, ARROW_DOWN
+	jne dontDecrement
+	cmp level,1
+	je dontDecrement
+	dec level
+	dontDecrement:
+	
+	cmp al,  0Dh ;ENTERKEY
+	jne printDif
+
+ret
+askDificulty endp
+
 start:
 	mov ah,02Ch
 	int 21h
@@ -1314,29 +1365,15 @@ menu:
 	call read_file
 	jmp menu
 	
-	startGame:
-	call game
+	CargarNivel:
+	call askDificulty
 	jmp menu
 	
-	CargarNivel:
-	posicion 0, 18
-	IMPRIMIR selecionarNivelText
-    mov ah, 01h
-    int 16h
-    jz CargarNivel
-    mov ah, 00h
-    int 16h
-    sub al, '0'  ;carga el nivel
-    mov ah, al 
-    mov al, 10
-    mul ah
-    mov bl, al 
-    mov ah, 00h
-    int 16h
-    sub al, '0' 
-    add bl, al
-    mov [level], bx
-	jmp start
+	startGame:
+	
+	call game
+	jmp menu
+
 	
 	showAbout:
 	posicion 0,3
