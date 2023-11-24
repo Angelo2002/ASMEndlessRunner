@@ -127,6 +127,14 @@ img_player db 730 dup(?)
 player_w dw ?
 player_h dw ?
 
+exp_iname db "exp.img",0
+img_exp db 1300 dup(?)
+exp_w dw ?
+exp_h dw ?
+
+
+
+
 img_meteor db 262 dup(?)
 
 
@@ -1183,15 +1191,37 @@ game proc
 	
 	noChange:
 	cmp iframe,0
-	jg decIframe
+	jle noIframe
+	jmp decIframe
+	noIframe:
 	CALL_CHECK_COLLISION metx_matrix,mety_matrix,meteor_ammount
 	cmp flag,1
 	jne noMetCol
+	LOAD_IMG_VARS exp_w, exp_h,img_exp
+	CALL_DRAW_IMG player_x,player_y
 	dec lives
 	mov iframe,IFRAME_TIME
 	cmp lives,0
 	jg noMetCol
-	;GAMEOVER
+	
+	posicion 0, 0 
+	
+	IMPRIMIR livesmsg
+	xor ax,ax
+	mov al,lives
+	mov number_size,1
+	call NumberToString
+	IMPRIMIR num_text
+	
+	mov ah,02Ch
+	int 21h
+	mov last_sec,dh
+	esperar3:
+		mov ah,02Ch
+		int 21h          
+		cmp dh, last_sec 
+		je esperar3
+	
 	call gameOver
 	call pauseP;-----------------------------------------------------------------------------------------------------------------------------------------------------------
 	jmp menu
@@ -1368,7 +1398,8 @@ start:
 	
 	CALL_LOAD_IMG player_iname, player_w, player_h, img_player
 	CALL_LOAD_IMG meteor_iname, meteor_w, meteor_h, img_meteor
-	
+	CALL_LOAD_IMG exp_iname, exp_w, exp_h,img_exp
+
 	mov filename_address, offset player_name
 	call askName
 	
