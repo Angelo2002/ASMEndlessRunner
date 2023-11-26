@@ -19,7 +19,7 @@ COOLDOWN_TIME equ 15
 
 
 
-IFRAME_TIME equ 10
+IFRAME_TIME equ 100
 iframe db 0
 
 flag db 0
@@ -99,6 +99,7 @@ num_text db 5 dup('0'),10,13, '$'
 
 handle dw ?
 
+image_width dw ?
 
 
 update_freq dw 25
@@ -377,7 +378,9 @@ ENDM
 
 LOAD_IMG_VARS MACRO imgW, imgH, img
 	mov img_address, offset img
-	mov w_address, offset imgW
+	;mov w_address, offset imgW
+	mov ax, imgW
+	mov image_width, AX
 	mov h_address, offset imgH
 ENDM
 ;macro para dibujar una imagen en x,y posicion
@@ -832,8 +835,7 @@ draw_img proc
 	;verificar el px
 	; si el color es 0 lo ignoramos para que deje el fondo
 	; si no lo pintamos calculando la posicion de memoria grafica
-	mov di, w_address
-	mov ax, [di] 
+	mov ax, image_width
 	mov di, h_address
 	mov bx, [di]
 	mul bx
@@ -843,6 +845,7 @@ draw_img proc
 	mov dx, [di]  ; dx <- posicion y de la imagen (calcular linea)
 	mov pos_y, dx
 	mov bx, 0 ; <-recorrido en X
+	
 	ciclo_draw_img:
 		;ignorar color 0
 		cmp [si], 0
@@ -856,9 +859,12 @@ draw_img proc
 		
 		mov ax, pos_y
 		mul screen_w
-		mov di, x_address
-		mov dx, [di]
-		add ax, dx
+		;mov di, x_address
+		
+		;mov dx, [di]
+		;add ax, dx
+		add ax,[di]
+		
 		add ax, bx
 		mov di, ax
 		mov al, [si]
@@ -866,10 +872,9 @@ draw_img proc
 		pint_sig_px:
 			inc bx
 			inc si
-			mov di, w_address
-			cmp bx, [di]
+			cmp bx, image_width
 			jne continuar_loop
-			mov bx, 0
+			xor bx,bx
 			inc pos_y
 		continuar_loop:
 			loop  ciclo_draw_img
@@ -1090,7 +1095,7 @@ game proc
 	
 	mov meteor_ammount,0
 	mov px_travel_since_spawn,20
-	mov lives, 3
+	mov lives, 9
 	
 	
 	
@@ -1127,9 +1132,9 @@ game proc
 	CALL_DRAW_IMG player_x,player_y
 	SPAWN_NEWCOL
 	DRAW_METEORS
-	CALL_DRAW_BUFF greenx_matrix, greeny_matrix, green_ammount, 10
-	CALL_DRAW_BUFF redx_matrix, redy_matrix, red_ammount, 12
-	CALL_DRAW_BUFF bluex_matrix, bluey_matrix, blue_ammount, 9
+	;CALL_DRAW_BUFF greenx_matrix, greeny_matrix, green_ammount, 10
+	;CALL_DRAW_BUFF redx_matrix, redy_matrix, red_ammount, 12
+	;CALL_DRAW_BUFF bluex_matrix, bluey_matrix, blue_ammount, 9
 	
 	posicion 0, 0 
 	
@@ -1347,6 +1352,7 @@ gameOver proc
 gameOver endp
 
 askDificulty proc
+	mov number_size,2
 	printDif:
 	posicion 0, 18
 	IMPRIMIR selecionarNivelText
