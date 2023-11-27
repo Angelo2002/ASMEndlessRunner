@@ -838,12 +838,15 @@ draw_img proc
 	mov ax, image_width
 	mov di, h_address
 	mov bx, [di]
+	shr bx,1
 	mul bx
 	mov cx, ax
 	mov si, img_address
 	mov di, y_address
 	mov dx, [di]  ; dx <- posicion y de la imagen (calcular linea)
 	mov pos_y, dx
+
+	
 	mov bx, 0 ; <-recorrido en X
 	
 	ciclo_draw_img:
@@ -857,8 +860,8 @@ draw_img proc
 		cmp ax,screen_w
 		jge pint_sig_px
 		
-		mov ax, pos_y
-		mul screen_w
+		mov ax, screen_w
+		mul pos_y
 		;mov di, x_address
 		
 		;mov dx, [di]
@@ -871,12 +874,17 @@ draw_img proc
 		mov es:[di], al
 		pint_sig_px:
 			inc bx
+			inc bx
+			inc si
 			inc si
 			cmp bx, image_width
 			jne continuar_loop
 			xor bx,bx
 			inc pos_y
+			inc pos_y
+			add si, image_width
 		continuar_loop:
+			dec cx
 			loop  ciclo_draw_img
 	ret    
 endp
